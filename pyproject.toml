@@ -1,0 +1,16 @@
+[project]
+name = "attendance"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "dearpygui>=2.0.0",
+    "pyscard>=2.2.2",
+    "sqlalchemy>=2.0.41",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.0",
+]
