@@ -66,12 +66,13 @@ def test_add_and_get_user(temp_db):
     db, _ = temp_db
     card_id = "user_card_001"
     name = "テスト太郎"
-    user_id = db.add_user(card_id, name)
+    user_id = db.add_user(card_id, name, is_admin=True)
     user = db.get_user(card_id)
     assert user is not None
     assert user.card_id == card_id
     assert user.name == name
     assert user.id == user_id
+    assert user.is_admin is True
     assert hasattr(user, "model_dump")  # pydanticモデルであること
 
 
@@ -79,7 +80,7 @@ def test_delete_user(temp_db):
     db, _ = temp_db
     card_id = "user_card_002"
     name = "削除ユーザー"
-    db.add_user(card_id, name)
+    db.add_user(card_id, name, is_admin=False)
     assert db.delete_user(card_id) is True
     user = db.get_user(card_id)
     assert user is None
@@ -90,17 +91,43 @@ def test_delete_user(temp_db):
 def test_list_users(temp_db):
     db, _ = temp_db
     users = [
-        ("cardid1", "ユーザー1"),
-        ("cardid2", "ユーザー2"),
-        ("cardid3", "ユーザー3"),
+        ("cardid1", "ユーザー1", True),
+        ("cardid2", "ユーザー2", False),
+        ("cardid3", "ユーザー3", False),
     ]
-    for card_id, name in users:
-        db.add_user(card_id, name)
+    for card_id, name, is_admin in users:
+        db.add_user(card_id, name, is_admin=is_admin)
     user_list = db.list_users()
     assert len(user_list) == 3
     card_ids = [u.card_id for u in user_list]
     names = [u.name for u in user_list]
-    for card_id, name in users:
+    for card_id, name, is_admin in users:
         assert card_id in card_ids
         assert name in names
+        # is_adminの値も一致することを確認
+        matched = [u for u in user_list if u.card_id == card_id]
+        assert matched and matched[0].is_admin == is_admin
     assert all(hasattr(u, "model_dump") for u in user_list)  # pydanticモデルであること
+
+
+def test_upsert_user(temp_db):
+    db, _ = temp_db
+    card_id = "upsert_card_001"
+    name1 = "最初の名前"
+    name2 = "更新後の名前"
+    # 新規追加
+    user_id1 = db.upsert_user(card_id, name1, is_admin=False)
+    user1 = db.get_user(card_id)
+    assert user1 is not None
+    assert user1.card_id == card_id
+    assert user1.name == name1
+    assert user1.is_admin is False
+    # 更新
+    user_id2 = db.upsert_user(card_id, name2, is_admin=True)
+    user2 = db.get_user(card_id)
+    assert user2 is not None
+    assert user2.card_id == card_id
+    assert user2.name == name2
+    assert user2.is_admin is True
+    # idは同じ
+    assert user_id1 == user_id2

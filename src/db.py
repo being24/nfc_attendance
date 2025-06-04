@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, DateTime, Integer, String, create_engine
+from sqlalchemy import Column, DateTime, Integer, String, Boolean, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -30,6 +30,7 @@ class CardUser(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     card_id = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
+    is_admin = Column(Boolean, nullable=False, default=False)  # 管理者フラグ
 
 
 class AttendanceDB:
@@ -104,9 +105,9 @@ class AttendanceDB:
                 writer.writerow([r.id, r.timestamp, r.card_id, r.type])
         return file_path
 
-    def add_user(self, card_id: str, name: str):
+    def add_user(self, card_id: str, name: str, is_admin: bool = False):
         with self.SessionLocal() as session:
-            user = CardUser(card_id=card_id, name=name)
+            user = CardUser(card_id=card_id, name=name, is_admin=is_admin)
             session.add(user)
             session.commit()
             return user.id
@@ -132,6 +133,24 @@ class AttendanceDB:
                 for u in session.query(CardUser).order_by(CardUser.id).all()
             ]
 
+    def upsert_user(self, card_id: str, name: str, is_admin: bool = False):
+        """
+        card_idが存在すれば更新、なければ新規追加する（upsert）
+        戻り値: user.id
+        """
+        with self.SessionLocal() as session:
+            user = session.query(CardUser).filter_by(card_id=card_id).first()
+            if user:
+                setattr(user, "name", name)
+                setattr(user, "is_admin", is_admin)
+                session.commit()
+                return user.id
+            else:
+                user = CardUser(card_id=card_id, name=name, is_admin=is_admin)
+                session.add(user)
+                session.commit()
+                return user.id
+
 
 class AttendanceSchema(BaseModel):
     id: int
@@ -145,4 +164,5 @@ class CardUserSchema(BaseModel):
     id: int
     card_id: str
     name: str
+    is_admin: bool
     model_config = ConfigDict(from_attributes=True)
