@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from db import AttendanceDB, AttendanceType
+from src.db import AttendanceDB, AttendanceType
 
 import time
 from datetime import datetime

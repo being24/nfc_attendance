@@ -1,3 +1,9 @@
+import sys
+from pathlib import Path
+
+# プロジェクトroot（srcの親）をsys.pathに追加（parents[0]でrootを取得）
+sys.path.insert(0, str(Path(__file__).parents[1]))
+
 import time
 from datetime import datetime
 from typing import Optional

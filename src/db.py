@@ -1,10 +1,11 @@
 import csv
-
 from datetime import datetime
 from enum import IntEnum
 from pathlib import Path
 from typing import Optional
-from sqlalchemy import Column, Integer, String, create_engine, DateTime
+
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Column, DateTime, Integer, String, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -22,6 +23,13 @@ class Attendance(Base):
     timestamp = Column(DateTime, nullable=False)
     card_id = Column(String, nullable=False)
     type = Column(Integer, nullable=False)  # 出退勤種別はintで保存
+
+
+class CardUser(Base):
+    __tablename__ = "card_user"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    card_id = Column(String, unique=True, nullable=False)
+    name = Column(String, nullable=False)
 
 
 class AttendanceDB:
@@ -63,7 +71,7 @@ class AttendanceDB:
         type_: Optional[AttendanceType] = None,
         year: Optional[int] = None,
         month: Optional[int] = None,
-    ):
+    ) -> list["AttendanceSchema"]:
         with self.SessionLocal() as session:
             query = session.query(Attendance)
             if card_id:
@@ -82,7 +90,10 @@ class AttendanceDB:
                 query = query.filter(
                     Attendance.timestamp >= from_dt, Attendance.timestamp < to_dt
                 )
-            return query.order_by(Attendance.timestamp).all()
+            return [
+                AttendanceSchema.model_validate(r)
+                for r in query.order_by(Attendance.timestamp).all()
+            ]
 
     def export_csv(self, year: int, month: int, file_path: str):
         records = self.search_records(year=year, month=month)
@@ -92,3 +103,46 @@ class AttendanceDB:
             for r in records:
                 writer.writerow([r.id, r.timestamp, r.card_id, r.type])
         return file_path
+
+    def add_user(self, card_id: str, name: str):
+        with self.SessionLocal() as session:
+            user = CardUser(card_id=card_id, name=name)
+            session.add(user)
+            session.commit()
+            return user.id
+
+    def get_user(self, card_id: str) -> Optional["CardUserSchema"]:
+        with self.SessionLocal() as session:
+            user = session.query(CardUser).filter_by(card_id=card_id).first()
+            return CardUserSchema.model_validate(user) if user else None
+
+    def delete_user(self, card_id: str):
+        with self.SessionLocal() as session:
+            user = session.query(CardUser).filter_by(card_id=card_id).first()
+            if user:
+                session.delete(user)
+                session.commit()
+                return True
+            return False
+
+    def list_users(self) -> list["CardUserSchema"]:
+        with self.SessionLocal() as session:
+            return [
+                CardUserSchema.model_validate(u)
+                for u in session.query(CardUser).order_by(CardUser.id).all()
+            ]
+
+
+class AttendanceSchema(BaseModel):
+    id: int
+    timestamp: datetime
+    card_id: str
+    type: int
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CardUserSchema(BaseModel):
+    id: int
+    card_id: str
+    name: str
+    model_config = ConfigDict(from_attributes=True)
