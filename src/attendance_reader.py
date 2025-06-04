@@ -1,7 +1,7 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parents[1]))
 from src.db import AttendanceDB, AttendanceType
 
 import time
@@ -10,6 +10,7 @@ from typing import Optional
 
 from smartcard.System import readers as get_readers
 from smartcard.util import toHexString
+from smartcard.CardMonitoring import CardMonitor, CardObserver
 
 
 class NFCReaderError(Exception):
@@ -46,6 +47,24 @@ class NFCReader:
             raise NFCReaderError(f"Failed to read card: {e}")
 
 
+class CardInsertObserver(CardObserver):
+    def __init__(self, callback):
+        self.callback = callback
+
+    def update(self, observable, handlers):
+        added_cards, removed_cards = handlers
+        for card in added_cards:
+            try:
+                connection = card.createConnection()
+                connection.connect()
+                send_data = [0xFF, 0xCA, 0x00, 0x00, 0x00]
+                data, sw1, sw2 = connection.transmit(send_data)
+                card_id = toHexString(data).replace(" ", "")
+                self.callback(card_id)
+            except Exception as e:
+                self.callback(None, error=e)
+
+
 def select_attendance_type() -> AttendanceType:
     while True:
         t = input("Type (1:出勤, 2:退勤): ")
@@ -56,26 +75,28 @@ def select_attendance_type() -> AttendanceType:
 
 def main():
     db = AttendanceDB()
-    try:
-        nfc = NFCReader()
-    except NFCReaderError as e:
-        print(e)
-        return
+    monitor = CardMonitor()
     print("Please touch your card...")
-    while True:
-        try:
-            card_id = nfc.read_card_id()
-            print(f"Card ID: {card_id}")
-            type_ = select_attendance_type()
-            db.add_record(card_id, type_, datetime.now())
-            print("記録しました。")
-            break
-        except NFCReaderError as e:
-            print(f"カード待機中... {e}")
+
+    def on_card(card_id, error=None):
+        if error:
+            print(f"Error: {error}")
+            return
+        print(f"Card ID: {card_id}")
+        type_ = select_attendance_type()
+        db.add_record(card_id, type_, datetime.now())
+        print("記録しました。終了します。")
+        monitor.deleteObserver(observer)
+        sys.exit(0)
+
+    observer = CardInsertObserver(on_card)
+    monitor.addObserver(observer)
+    try:
+        while True:
             time.sleep(1)
-        except Exception as e:
-            print(f"予期せぬエラー: {e}")
-            time.sleep(1)
+    except KeyboardInterrupt:
+        print("終了します。")
+        monitor.deleteObserver(observer)
 
 
 if __name__ == "__main__":
