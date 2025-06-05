@@ -382,7 +382,7 @@ def main():
                         tag="offset_done_popup",
                     ):
                         dpg.add_text(
-                            f"{offset_val:.2f} 時間で登録しました",
+                            f"{offset_val:.1f} 時間で登録しました",
                             pos=(30, 30),
                         )
                         dpg.bind_item_font(dpg.last_item(), small_font)
@@ -720,15 +720,22 @@ def main():
             end2 = datetime(year + 1, 3, 31, 23, 59, 59)
             t1_9_17, t1_other = calc_total_time_split(card_id, start1, end1)
             t2_9_17, t2_other = calc_total_time_split(card_id, start2, end2)
-            # 名前取得
+            # 名前・オフセット取得
             user = db.get_user(card_id)
             name = user.name if user and getattr(user, "name", None) else "Unknown"
+            offset = (
+                user.offset if user and hasattr(user, "offset") and user.offset else 0.0
+            )
+            # 2025年前半(4-9月)のみオフセット加算
+            if year == 2025:
+                t1_9_17 += offset * 3600
+                t1_other += 0  # 必要なら他にも加算
 
             # ポップアップで表示（UIスレッドで実行）
             def show_confirm_popup():
                 # msg = (
-                #     f"4-9月  9-17時: {t1_9_17 / 3600:.2f} Hour  その他: {t1_other / 3600:.2f} Hour\n"
-                #     f"10-3月 9-17時: {t2_9_17 / 3600:.2f} Hour  その他: {t2_other / 3600:.2f} Hour"
+                #     f"4-9月  9-17時: {t1_9_17 / 3600:.1f} Hour  その他: {t1_other / 3600:.1f} Hour\n"
+                #     f"10-3月 9-17時: {t2_9_17 / 3600:.1f} Hour  その他: {t2_other / 3600:.1f} Hour"
                 # )
                 popup_width = int(win_width * 0.7)
                 popup_height = 180
@@ -763,12 +770,12 @@ def main():
                         dpg.add_table_column(label="その他 (Hour)")
                         with dpg.table_row():
                             dpg.add_text("4-9月")
-                            dpg.add_text(f"{t1_9_17 / 3600:.2f}")
-                            dpg.add_text(f"{t1_other / 3600:.2f}")
+                            dpg.add_text(f"{t1_9_17 / 3600:.1f}")
+                            dpg.add_text(f"{t1_other / 3600:.1f}")
                         with dpg.table_row():
                             dpg.add_text("10-3月")
-                            dpg.add_text(f"{t2_9_17 / 3600:.2f}")
-                            dpg.add_text(f"{t2_other / 3600:.2f}")
+                            dpg.add_text(f"{t2_9_17 / 3600:.1f}")
+                            dpg.add_text(f"{t2_other / 3600:.1f}")
                     dpg.bind_item_font("confirm_name_text", small_font)
                     # 閉じるボタン追加
                     btn_w = 90
