@@ -5,15 +5,16 @@ import dearpygui.dearpygui as dpg
 from smartcard.CardMonitoring import CardMonitor
 
 from src.attendance_reader import CardEventObserver, NFCReader
+from src.calc_time import calc_total_time_split
 from src.db import AttendanceDB, AttendanceType
 from src.log_config import logger
-from src.calc_time import calc_total_time_split
 
 
 def main():
     nfc_reader = NFCReader()
     # AttendanceDBインスタンスをmain関数の先頭で1つだけ生成
     db = AttendanceDB()
+    monitor = CardMonitor()
 
     logger.info("Application started")
     dpg.create_context()
@@ -76,10 +77,11 @@ def main():
             btns.append(btn)
         # コールバック設定（登録・出力のみ既存機能）
         dpg.set_item_callback(
-            "register_btn", lambda: show_card_touch_popup("register", nfc_reader)
+            "register_btn",
+            lambda: show_card_touch_popup("register", nfc_reader, monitor),
         )
         dpg.set_item_callback(
-            "csv_btn", lambda: show_card_touch_popup("csv", nfc_reader)
+            "csv_btn", lambda: show_card_touch_popup("csv", nfc_reader, monitor)
         )
         # 出勤・退勤ボタンを横方向中央揃え・下方向に少しだけ間隔を広げて配置
         btns_total_width = btn_width * 2 + margin
@@ -305,7 +307,7 @@ def main():
                         dpg.set_frame_callback(
                             dpg.get_frame_count() + 1,
                             lambda s, a: show_card_touch_popup(
-                                "admin_action", nfc_reader
+                                "admin_action", nfc_reader, monitor
                             ),
                         )
 
@@ -442,7 +444,7 @@ def main():
             )
 
         # show_card_touch_popupでadmin_action時の処理を追加
-        def show_card_touch_popup(mode, nfc_reader):
+        def show_card_touch_popup(mode, nfc_reader, monitor):
             logger.info(f"Show card touch popup: {mode}")
             if mode == "register":
                 # まずカードIDを直接取得してみる
@@ -521,7 +523,6 @@ def main():
                 )
 
             # イベント駆動NFC監視
-            monitor = CardMonitor()
             observer = None
 
             def on_card_touched(event_type, card_id, error=None):
@@ -573,7 +574,7 @@ def main():
             width=btn_width,
             height=btn_height,
             pos=(btns_start_x, btn_y),
-            callback=lambda: show_card_touch_popup("in", nfc_reader),
+            callback=lambda: show_card_touch_popup("in", nfc_reader, monitor),
         )
         dpg.bind_item_theme(btn1, theme_in)
         # 退室ボタン（右・赤）
@@ -587,15 +588,16 @@ def main():
             width=btn_width,
             height=btn_height,
             pos=(btns_start_x + btn_width + margin, btn_y),
-            callback=lambda: show_card_touch_popup("out", nfc_reader),
+            callback=lambda: show_card_touch_popup("out", nfc_reader, monitor),
         )
         dpg.bind_item_theme(btn2, theme_out)
         # 新規登録・CSV出力ボタンも同様に修正
         dpg.set_item_callback(
-            "register_btn", lambda: show_card_touch_popup("register", nfc_reader)
+            "register_btn",
+            lambda: show_card_touch_popup("register", nfc_reader, monitor),
         )
         dpg.set_item_callback(
-            "csv_btn", lambda: show_card_touch_popup("csv", nfc_reader)
+            "csv_btn", lambda: show_card_touch_popup("csv", nfc_reader, monitor)
         )
 
         # 入力ボタン（管理者認証付き）
@@ -647,7 +649,6 @@ def main():
                         dpg.delete_item("input_card_popup")
                 # removeイベントはここでは何もしない
 
-            monitor = CardMonitor()
             observer = CardEventObserver(on_card)
             monitor.addObserver(observer)
 
@@ -687,7 +688,6 @@ def main():
                     callback=lambda: dpg.delete_item("input_card_popup"),
                     tag="input_popup_back_btn",
                 )
-            monitor = CardMonitor()
             observer = CardEventObserver(on_card)
             monitor.addObserver(observer)
 
@@ -706,7 +706,7 @@ def main():
 
         def on_confirm_btn():
             # 普通のタッチのpopupを表示し、カードID取得後にhandle_card_touched_for_confirmを呼ぶ
-            show_card_touch_popup("confirm", nfc_reader)
+            show_card_touch_popup("confirm", nfc_reader, monitor)
 
         def handle_card_touched_for_confirm(card_id):
             # 今年度の4/1～9/30, 10/1～3/31
@@ -726,10 +726,10 @@ def main():
 
             # ポップアップで表示（UIスレッドで実行）
             def show_confirm_popup():
-                msg = (
-                    f"4-9月  9-17時: {t1_9_17 / 3600:.2f} Hour  その他: {t1_other / 3600:.2f} Hour\n"
-                    f"10-3月 9-17時: {t2_9_17 / 3600:.2f} Hour  その他: {t2_other / 3600:.2f} Hour"
-                )
+                # msg = (
+                #     f"4-9月  9-17時: {t1_9_17 / 3600:.2f} Hour  その他: {t1_other / 3600:.2f} Hour\n"
+                #     f"10-3月 9-17時: {t2_9_17 / 3600:.2f} Hour  その他: {t2_other / 3600:.2f} Hour"
+                # )
                 popup_width = int(win_width * 0.7)
                 popup_height = 180
                 popup_x = int((win_width - popup_width) * 0.5)
@@ -770,6 +770,19 @@ def main():
                             dpg.add_text(f"{t2_9_17 / 3600:.2f}")
                             dpg.add_text(f"{t2_other / 3600:.2f}")
                     dpg.bind_item_font("confirm_name_text", small_font)
+                    # 閉じるボタン追加
+                    btn_w = 90
+                    btn_h = 36
+                    btn_x = int((popup_width - btn_w) / 2)
+                    btn_y = popup_height - btn_h - 10
+                    dpg.add_button(
+                        label="閉じる",
+                        width=btn_w,
+                        height=btn_h,
+                        pos=(btn_x, btn_y),
+                        callback=lambda: dpg.delete_item("confirm_result_popup"),
+                        tag="confirm_close_btn",
+                    )
                 dpg.set_frame_callback(
                     dpg.get_frame_count() + 480,
                     lambda s, a: dpg.delete_item("confirm_result_popup"),
