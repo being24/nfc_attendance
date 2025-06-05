@@ -74,6 +74,10 @@ def test_add_and_get_user(temp_db):
     assert user.id == user_id
     assert user.is_admin is True
     assert hasattr(user, "model_dump")  # pydanticモデルであること
+    assert hasattr(user, "student_number")
+    assert user.student_number is None
+    assert hasattr(user, "offset")
+    assert user.offset == 0
 
 
 def test_delete_user(temp_db):
@@ -122,6 +126,10 @@ def test_upsert_user(temp_db):
     assert user1.card_id == card_id
     assert user1.name == name1
     assert user1.is_admin is False
+    assert hasattr(user1, "student_number")
+    assert user1.student_number is None
+    assert hasattr(user1, "offset")
+    assert user1.offset == 0
     # 更新
     user_id2 = db.upsert_user(card_id, name2, is_admin=True)
     user2 = db.get_user(card_id)
@@ -129,5 +137,9 @@ def test_upsert_user(temp_db):
     assert user2.card_id == card_id
     assert user2.name == name2
     assert user2.is_admin is True
+    assert hasattr(user2, "student_number")
+    assert user2.student_number is None
+    assert hasattr(user2, "offset")
+    assert user2.offset == 0
     # idは同じ
     assert user_id1 == user_id2

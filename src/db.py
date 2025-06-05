@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic import BaseModel, ConfigDict
-from sqlalchemy import Column, DateTime, Integer, String, Boolean, create_engine
+from sqlalchemy import Column, DateTime, Integer, String, Boolean, Float, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 Base = declarative_base()
@@ -30,7 +30,9 @@ class CardUser(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     card_id = Column(String, unique=True, nullable=False)
     name = Column(String, nullable=False)
+    student_number = Column(String, nullable=True)  # 学籍番号カラム
     is_admin = Column(Boolean, nullable=False, default=False)  # 管理者フラグ
+    offset = Column(Float, nullable=False, default=0.0)  # オフセットをfloat型に変更
 
 
 class AttendanceDB:
@@ -133,7 +135,14 @@ class AttendanceDB:
                 for u in session.query(CardUser).order_by(CardUser.id).all()
             ]
 
-    def upsert_user(self, card_id: str, name: str, is_admin: bool = False):
+    def upsert_user(
+        self,
+        card_id: str,
+        name: Optional[str] = None,
+        is_admin: Optional[bool] = None,
+        student_number: Optional[str] = None,
+        offset: Optional[float] = None,  # int→float
+    ):
         """
         card_idが存在すれば更新、なければ新規追加する（upsert）
         戻り値: user.id
@@ -141,15 +150,48 @@ class AttendanceDB:
         with self.SessionLocal() as session:
             user = session.query(CardUser).filter_by(card_id=card_id).first()
             if user:
-                setattr(user, "name", name)
-                setattr(user, "is_admin", is_admin)
+                if name is not None:
+                    setattr(user, "name", name)
+                if is_admin is not None:
+                    setattr(user, "is_admin", is_admin)
+                if student_number is not None:
+                    setattr(user, "student_number", student_number)
+                if offset is not None:
+                    setattr(user, "offset", offset)
                 session.commit()
                 return user.id
             else:
-                user = CardUser(card_id=card_id, name=name, is_admin=is_admin)
+                user = CardUser(
+                    card_id=card_id,
+                    name=name if name is not None else "",
+                    is_admin=is_admin if is_admin is not None else False,
+                    student_number=student_number,
+                    offset=offset if offset is not None else 0.0,  # 0→0.0
+                )
                 session.add(user)
                 session.commit()
                 return user.id
+
+    def search_records_during(
+        self,
+        card_id: Optional[str],
+        start: datetime,
+        end: datetime,
+    ) -> list["AttendanceSchema"]:
+        """
+        指定カードID・期間（start≦timestamp≦end）でレコードを検索
+        """
+        with self.SessionLocal() as session:
+            query = session.query(Attendance)
+            if card_id:
+                query = query.filter(Attendance.card_id == card_id)
+            query = query.filter(
+                Attendance.timestamp >= start, Attendance.timestamp <= end
+            )
+            return [
+                AttendanceSchema.model_validate(r)
+                for r in query.order_by(Attendance.timestamp).all()
+            ]
 
 
 class AttendanceSchema(BaseModel):
@@ -164,5 +206,7 @@ class CardUserSchema(BaseModel):
     id: int
     card_id: str
     name: str
+    student_number: str | None = None
     is_admin: bool
+    offset: float = 0.0  # オフセットをfloat型に変更
     model_config = ConfigDict(from_attributes=True)

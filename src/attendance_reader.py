@@ -47,7 +47,14 @@ class NFCReader:
             raise NFCReaderError(f"Failed to read card: {e}")
 
 
-class CardInsertObserver(CardObserver):
+class CardEventObserver(CardObserver):
+    """
+    カードの挿入（タッチ）・離脱イベントを検知し、
+    callback(event_type, card_id, error=None) を呼び出す。
+    event_type: 'insert' or 'remove'
+    card_id: カードID（remove時はNoneになる場合あり）
+    """
+
     def __init__(self, callback):
         self.callback = callback
 
@@ -60,9 +67,12 @@ class CardInsertObserver(CardObserver):
                 send_data = [0xFF, 0xCA, 0x00, 0x00, 0x00]
                 data, sw1, sw2 = connection.transmit(send_data)
                 card_id = toHexString(data).replace(" ", "")
-                self.callback(card_id)
+                self.callback("insert", card_id)
             except Exception as e:
-                self.callback(None, error=e)
+                self.callback("insert", None, error=e)
+        for card in removed_cards:
+            # 離脱時はカードIDが取得できない場合が多いのでNoneで通知
+            self.callback("remove", None)
 
 
 def select_attendance_type() -> AttendanceType:
@@ -74,22 +84,16 @@ def select_attendance_type() -> AttendanceType:
 
 
 def main():
-    db = AttendanceDB()
     monitor = CardMonitor()
     print("Please touch your card...")
 
-    def on_card(card_id, error=None):
+    def on_card(event_type, card_id, error=None):
+        print(f"event_type={event_type}, card_id={card_id}")
         if error:
             print(f"Error: {error}")
-            return
-        print(f"Card ID: {card_id}")
-        type_ = select_attendance_type()
-        db.add_record(card_id, type_, datetime.now())
-        print("記録しました。終了します。")
-        monitor.deleteObserver(observer)
-        sys.exit(0)
+        # ここではdeleteObserverやsys.exitは呼ばず、イベント表示のみ
 
-    observer = CardInsertObserver(on_card)
+    observer = CardEventObserver(on_card)
     monitor.addObserver(observer)
     try:
         while True:
