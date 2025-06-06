@@ -1,0 +1,9 @@
+# zip配布時に含めないファイル/ディレクトリ
+.gitignore export-ignore
+.gitattributes export-ignore
+README.md export-ignore
+logs/ export-ignore
+test/ export-ignore
+src/__pycache__/ export-ignore
+*.pyc export-ignore
+# uv関連ファイルは残す

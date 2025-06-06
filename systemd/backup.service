@@ -1,0 +1,7 @@
+[Unit]
+Description=定期的にattendance.dbをNASにrsyncでバックアップ
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rsync -a /home/ubuntu/attendance/data/attendance.db /mnt/nas/attendance/attendance.db.$(date +%Y%m%d%H%M%S).bak
+User=ubuntu

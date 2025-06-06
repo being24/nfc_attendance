@@ -1,0 +1,14 @@
+[Unit]
+Description=Attendance Management GUI
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/attendance
+ExecStart=/usr/bin/python3 /home/ubuntu/attendance/main.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
