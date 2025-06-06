@@ -26,9 +26,11 @@ def calc_total_time(
                     prev.type == AttendanceType.CLOCK_IN
                     and prev.timestamp < rec.timestamp
                 ):
-                    delta = (rec.timestamp - prev.timestamp).total_seconds()
-                    if delta > 0:
-                        total_seconds += delta
+                    # 日付をまたぐ場合は無効
+                    if prev.timestamp.date() == rec.timestamp.date():
+                        delta = (rec.timestamp - prev.timestamp).total_seconds()
+                        if delta > 0:
+                            total_seconds += delta
                     break  # 1つの入室に対して1つの退出のみ対応
     return total_seconds
 
@@ -55,8 +57,10 @@ def calc_total_time_split(
                     and prev.timestamp < rec.timestamp
                     and j not in used_in
                 ):
-                    inout_pairs.append((prev.timestamp, rec.timestamp))
-                    used_in.add(j)
+                    # 日付をまたぐ場合は無効
+                    if prev.timestamp.date() == rec.timestamp.date():
+                        inout_pairs.append((prev.timestamp, rec.timestamp))
+                        used_in.add(j)
                     break
     total_9_17 = 0.0
     total_other = 0.0
