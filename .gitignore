@@ -12,3 +12,5 @@ wheels/
 logs/*.log
 logs/*.log.*
 .vscode/*
+
+*.csv
