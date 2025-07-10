@@ -70,28 +70,6 @@ class TimeReportGenerator:
             )
 
             total_business += user.offset * 3600
-
-            print(f"Processing user: {user.name} (Card ID: {user.card_id})")
-            print(
-                f"  Total business hours: {total_business / 3600:.2f}H"
-                f"  Total other hours: {total_other / 3600:.2f}H"
-                f" Total hours: {(total_business + total_other) / 3600:.2f}H"
-            )
-
-            # total_business_other, total_other_other = calc_total_time_split(
-            #     user.card_id,
-            #     start_dt,
-            #     end_dt,
-            # )
-
-            # total_business_other += user.offset * 3600
-
-            # print(
-            #     f"  Total business hours (other): {total_business_other / 3600:.2f}H"
-            #     f"  Total other hours (other): {total_other_other / 3600:.2f}H"
-            #     f" Total hours (other): {(total_business_other + total_other_other) / 3600:.2f}H"
-            # )
-
             # 学籍番号を user.student_id から取得（なければ空文字列）
             student_id = str(getattr(user, "student_number", ""))
 
@@ -144,9 +122,9 @@ class TimeReportGenerator:
                 print()
 
         # 全体合計
-        print("-" * 72)
+        print("-" * 60)
         print(
-            f"{'合計':<15} {'':<12} {'':<12} "
+            f"{'合計':<15} {'':<12} "
             f"{total_business_all:>6.1f}H {total_other_all:>6.1f}H "
             f"{total_business_all + total_other_all:>6.1f}H"
         )
@@ -208,7 +186,6 @@ class TimeReportGenerator:
             )
 
             # データ行
-
             for report in reports:
                 business_h = report.total_business_hours / 3600
                 other_h = report.total_other_hours / 3600
