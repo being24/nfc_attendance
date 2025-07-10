@@ -17,6 +17,7 @@ class UserTimeReport(BaseModel):
     """ユーザーの時間レポートデータ"""
 
     card_id: str
+    student_id: str  # 学籍番号
     name: str
     total_business_hours: float  # 9-17時の合計時間（秒）
     total_other_hours: float  # その他の合計時間（秒）
@@ -70,8 +71,33 @@ class TimeReportGenerator:
 
             total_business += user.offset * 3600
 
+            print(f"Processing user: {user.name} (Card ID: {user.card_id})")
+            print(
+                f"  Total business hours: {total_business / 3600:.2f}H"
+                f"  Total other hours: {total_other / 3600:.2f}H"
+                f" Total hours: {(total_business + total_other) / 3600:.2f}H"
+            )
+
+            # total_business_other, total_other_other = calc_total_time_split(
+            #     user.card_id,
+            #     start_dt,
+            #     end_dt,
+            # )
+
+            # total_business_other += user.offset * 3600
+
+            # print(
+            #     f"  Total business hours (other): {total_business_other / 3600:.2f}H"
+            #     f"  Total other hours (other): {total_other_other / 3600:.2f}H"
+            #     f" Total hours (other): {(total_business_other + total_other_other) / 3600:.2f}H"
+            # )
+
+            # 学籍番号を user.student_id から取得（なければ空文字列）
+            student_id = str(getattr(user, "student_number", ""))
+
             report = UserTimeReport(
                 card_id=user.card_id,
+                student_id=student_id,
                 name=user.name,
                 total_business_hours=total_business,
                 total_other_hours=total_other,
@@ -90,8 +116,10 @@ class TimeReportGenerator:
         print(f"=== 勤怠時間レポート ({start_dt.date()} ～ {end_dt.date()}) ===\n")
 
         # ヘッダー
-        print(f"{'名前':<15} {'カードID':<12} {'9-17時':<8} {'その他':<8} {'合計':<8}")
-        print("-" * 60)
+        print(
+            f"{'名前':<15} {'学籍番号':<12} {'カードID':<12} {'9-17時':<8} {'その他':<8} {'合計':<8}"
+        )
+        print("-" * 72)
 
         total_business_all = 0.0
         total_other_all = 0.0
@@ -106,7 +134,7 @@ class TimeReportGenerator:
             total_other_all += other_hours
 
             print(
-                f"{report.name:<15} {report.card_id:<12} "
+                f"{report.name:<15} {report.student_id:<12} {report.card_id:<12} "
                 f"{business_hours:>6.1f}H {other_hours:>6.1f}H {total_hours:>6.1f}H"
             )
 
@@ -116,9 +144,9 @@ class TimeReportGenerator:
                 print()
 
         # 全体合計
-        print("-" * 60)
+        print("-" * 72)
         print(
-            f"{'合計':<15} {'':<12} "
+            f"{'合計':<15} {'':<12} {'':<12} "
             f"{total_business_all:>6.1f}H {total_other_all:>6.1f}H "
             f"{total_business_all + total_other_all:>6.1f}H"
         )
@@ -157,6 +185,7 @@ class TimeReportGenerator:
             writer.writerow(
                 [
                     "名前",
+                    "学籍番号",
                     "カードID",
                     "9-17時(時間)",
                     "その他(時間)",
@@ -179,6 +208,7 @@ class TimeReportGenerator:
             )
 
             # データ行
+
             for report in reports:
                 business_h = report.total_business_hours / 3600
                 other_h = report.total_other_hours / 3600
@@ -186,7 +216,8 @@ class TimeReportGenerator:
 
                 w = report.weekly_data
                 row = [
-                    report.name,
+                    report.name.replace(" ", "").replace("\u3000", ""),
+                    report.student_id,
                     report.card_id,
                     f"{business_h:.2f}",
                     f"{other_h:.2f}",

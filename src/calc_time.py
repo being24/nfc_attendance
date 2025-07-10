@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Optional, Tuple
 from pydantic import BaseModel
 from src.db import AttendanceDB, AttendanceType, AttendanceSchema
@@ -136,37 +136,24 @@ def calc_weekly_time_split(
     """
     曜日ごとに9-17時とそれ以外の積算時間（秒）を分けて返す。
     """
-    db = AttendanceDB(db_file)
-    records: list[AttendanceSchema] = db.search_records_during(
-        card_id=card_id, start=start_dt, end=end_dt
-    )
-
+    # records, used_in は不要
     # 曜日別の時間集計用辞書（0=月曜、6=日曜）
     weekday_times: dict[int, dict[str, float]] = {
         i: {"business_hours": 0.0, "other_hours": 0.0} for i in range(7)
     }
-    used_in: set[int] = set()
 
-    # 退室記録を基準に入退室ペアを作成
-    for i, rec in enumerate(records):
-        if rec.type != AttendanceType.CLOCK_OUT:
-            continue
-
-        # 対応する入室記録を探す
-        checkin_index, checkin_rec = _find_matching_checkin(records, i, used_in)
-        if checkin_index is None or checkin_rec is None:
-            continue
-
-        # 時間を計算
-        weekday = checkin_rec.timestamp.weekday()
-        business_hours, other_hours = _calculate_time_periods(
-            checkin_rec.timestamp, rec.timestamp
-        )
-
-        # 曜日別に加算
-        weekday_times[weekday]["business_hours"] += business_hours
-        weekday_times[weekday]["other_hours"] += other_hours
-        used_in.add(checkin_index)
+    # 各曜日ごとにcalc_total_time_splitを呼び出して集計
+    for weekday in range(7):
+        # その曜日の開始・終了を全期間でループ
+        cur_date = start_dt.date()
+        while cur_date <= end_dt.date():
+            if cur_date.weekday() == weekday:
+                day_start = datetime.combine(cur_date, time(0, 0, 0))
+                day_end = datetime.combine(cur_date, time(23, 59, 59))
+                b, o = calc_total_time_split(card_id, day_start, day_end, db_file)
+                weekday_times[weekday]["business_hours"] += b
+                weekday_times[weekday]["other_hours"] += o
+            cur_date = cur_date + timedelta(days=1)
 
     # WeeklyTimeDataに変換
     return WeeklyTimeData(
