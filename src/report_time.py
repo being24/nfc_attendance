@@ -9,7 +9,7 @@ from pydantic import BaseModel
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.calc_time import WeeklyTimeData, calc_weekly_time_split, calc_total_time_split
+from src.calc_time import WeeklyTimeData, calc_weekly_time_split
 from src.db import AttendanceDB
 
 

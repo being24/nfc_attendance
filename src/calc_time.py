@@ -57,54 +57,25 @@ def calc_total_time(
 def calc_total_time_split(
     card_id: str, start_dt: datetime, end_dt: datetime, db_file: Optional[str] = None
 ) -> Tuple[float, float]:
-    """
-    9～17時台の積算時間（秒）と、それ以外の積算時間（秒）を分けて返す。
-    """
-    db = AttendanceDB(db_file)
-    records: list[AttendanceSchema] = db.search_records_during(
-        card_id=card_id, start=start_dt, end=end_dt
+    weekly = calc_weekly_time_split(card_id, start_dt, end_dt, db_file)
+    total_9_17 = (
+        weekly.monday.business_hours
+        + weekly.tuesday.business_hours
+        + weekly.wednesday.business_hours
+        + weekly.thursday.business_hours
+        + weekly.friday.business_hours
+        + weekly.saturday.business_hours
+        + weekly.sunday.business_hours
     )
-    nine = time(9, 0, 0)
-    seventeen = time(17, 0, 0)
-    inout_pairs: list[Tuple[datetime, datetime]] = []
-    # 退出（CLOCK_OUT）を基準に、その直前の入室（CLOCK_IN）を探す
-    used_in: set[int] = set()
-    for i, rec in enumerate(records):
-        if rec.type == AttendanceType.CLOCK_OUT:
-            for j in range(i - 1, -1, -1):
-                prev = records[j]
-                if (
-                    prev.type == AttendanceType.CLOCK_IN
-                    and prev.timestamp < rec.timestamp
-                    and j not in used_in
-                ):
-                    # 日付をまたぐ場合は無効
-                    if prev.timestamp.date() == rec.timestamp.date():
-                        inout_pairs.append((prev.timestamp, rec.timestamp))
-                        used_in.add(j)
-                    break
-    total_9_17 = 0.0
-    total_other = 0.0
-    for t_in, t_out in inout_pairs:
-        cur = t_in
-        while cur < t_out:
-            next_point = min(
-                datetime.combine(cur.date(), seventeen)
-                if cur.time() < seventeen
-                else t_out,
-                t_out,
-            )
-            if nine <= cur.time() < seventeen:
-                # 9:00～17:00の区間
-                delta = (next_point - cur).total_seconds()
-                total_9_17 += delta
-            else:
-                delta = (next_point - cur).total_seconds()
-                total_other += delta
-            cur = next_point
-            if cur.time() == seventeen:
-                # 17:00を超えたら次は17:00以降
-                cur = datetime.combine(cur.date(), seventeen)
+    total_other = (
+        weekly.monday.other_hours
+        + weekly.tuesday.other_hours
+        + weekly.wednesday.other_hours
+        + weekly.thursday.other_hours
+        + weekly.friday.other_hours
+        + weekly.saturday.other_hours
+        + weekly.sunday.other_hours
+    )
     return total_9_17, total_other
 
 
