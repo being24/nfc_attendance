@@ -741,11 +741,11 @@ def main():
             # 今年度の4/1～9/30, 10/1～3/31
             today = datetime.now().date()
             year = today.year
-            # 4/1～9/30
+            # 4/1～9/18
             start1 = datetime(year, 4, 1)
-            end1 = datetime(year, 9, 30, 23, 59, 59)
-            # 10/1～翌年3/31
-            start2 = datetime(year, 10, 1)
+            end1 = datetime(year, 9, 18, 23, 59, 59)
+            # 9/19～翌年3/31
+            start2 = datetime(year, 9, 19)
             end2 = datetime(year + 1, 3, 31, 23, 59, 59)
             t1_9_17, t1_other = calc_total_time_split(card_id, start1, end1)
             t2_9_17, t2_other = calc_total_time_split(card_id, start2, end2)
