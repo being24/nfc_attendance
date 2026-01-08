@@ -69,7 +69,6 @@ class TimeReportGenerator:
                 ]
             )
 
-            total_business += user.offset * 3600
             # 学籍番号を user.student_id から取得（なければ空文字列）
             student_id = str(getattr(user, "student_number", ""))
 
