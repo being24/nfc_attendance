@@ -521,7 +521,7 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
-                    show_read_error_popup()
+                    # show_read_error_popup()
                     return
             elif mode == "in":
                 try:
@@ -532,7 +532,7 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
-                    show_read_error_popup()
+                    # show_read_error_popup()
                     return
             elif mode == "out":
                 try:
@@ -543,7 +543,7 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
-                    show_read_error_popup()
+                    # show_read_error_popup()
                     return
             elif mode == "confirm":
                 try:
@@ -554,7 +554,7 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
-                    show_read_error_popup()
+                    # show_read_error_popup()
                     return
             if dpg.does_item_exist("card_touch_popup"):
                 dpg.delete_item("card_touch_popup")
@@ -602,7 +602,7 @@ def main():
                 if event_type == "insert":
                     if error:
                         logger.error(f"NFC event error: {error}")
-                        show_read_error_popup()
+                        # show_read_error_popup()
                     elif card_id:
                         logger.info(f"Card touched (event): {card_id}")
                         if mode == "register":
