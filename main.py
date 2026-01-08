@@ -522,7 +522,7 @@ def main():
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
                     # show_read_error_popup()
-                    return
+                    # return
             elif mode == "in":
                 try:
                     card_id = nfc_reader.read_card_id()
@@ -533,7 +533,7 @@ def main():
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
                     # show_read_error_popup()
-                    return
+                    # return
             elif mode == "out":
                 try:
                     card_id = nfc_reader.read_card_id()
@@ -544,7 +544,7 @@ def main():
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
                     # show_read_error_popup()
-                    return
+                    # return
             elif mode == "confirm":
                 try:
                     card_id = nfc_reader.read_card_id()
@@ -555,7 +555,7 @@ def main():
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
                     # show_read_error_popup()
-                    return
+                    # return
             if dpg.does_item_exist("card_touch_popup"):
                 dpg.delete_item("card_touch_popup")
             # ポップアップウィンドウ作成
