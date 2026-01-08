@@ -472,6 +472,42 @@ def main():
                 dpg.get_frame_count() + 1, lambda s, a: show_offset_popup()
             )
 
+        def show_read_error_popup(message="読み取りエラー\n管理者に連絡してください"):
+            popup_width = int(win_width * 0.5)
+            popup_height = 120
+            popup_x = int((win_width - popup_width) * 0.5)
+            popup_y = int((win_height - popup_height) * 0.5)
+
+            def create_popup():
+                if dpg.does_item_exist("read_error_popup"):
+                    dpg.delete_item("read_error_popup")
+                with dpg.window(
+                    label="読み取りエラー",
+                    modal=True,
+                    no_title_bar=True,
+                    no_resize=True,
+                    no_collapse=True,
+                    width=popup_width,
+                    height=popup_height,
+                    pos=(popup_x, popup_y),
+                    tag="read_error_popup",
+                ):
+                    text_id = dpg.add_text(
+                        message,
+                        pos=(int(popup_width / 2 - 150), int(popup_height / 2 - 20)),
+                        wrap=popup_width - 40,
+                    )
+                    dpg.bind_item_font(text_id, small_font)
+                dpg.show_item("read_error_popup")
+                dpg.set_frame_callback(
+                    dpg.get_frame_count() + 120,
+                    lambda s, a: dpg.delete_item("read_error_popup"),
+                )
+
+            dpg.set_frame_callback(
+                dpg.get_frame_count() + 1, lambda s, a: create_popup()
+            )
+
         # show_card_touch_popupでadmin_action時の処理を追加
         def show_card_touch_popup(mode, nfc_reader, monitor):
             logger.info(f"Show card touch popup: {mode}")
@@ -485,6 +521,8 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
+                    show_read_error_popup()
+                    return
             elif mode == "in":
                 try:
                     card_id = nfc_reader.read_card_id()
@@ -494,6 +532,8 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
+                    show_read_error_popup()
+                    return
             elif mode == "out":
                 try:
                     card_id = nfc_reader.read_card_id()
@@ -503,6 +543,8 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
+                    show_read_error_popup()
+                    return
             elif mode == "confirm":
                 try:
                     card_id = nfc_reader.read_card_id()
@@ -512,6 +554,8 @@ def main():
                         return
                 except Exception as e:
                     logger.info(f"No card present or read error: {e}")
+                    show_read_error_popup()
+                    return
             if dpg.does_item_exist("card_touch_popup"):
                 dpg.delete_item("card_touch_popup")
             # ポップアップウィンドウ作成
@@ -558,6 +602,7 @@ def main():
                 if event_type == "insert":
                     if error:
                         logger.error(f"NFC event error: {error}")
+                        show_read_error_popup()
                     elif card_id:
                         logger.info(f"Card touched (event): {card_id}")
                         if mode == "register":
@@ -741,12 +786,14 @@ def main():
             # 今年度の4/1～9/30, 10/1～3/31
             today = datetime.now().date()
             year = today.year
+            # 年度判定：1-3月なら前年度、4月以降なら今年度
+            fiscal_year = year if today.month >= 4 else year - 1
             # 4/1～9/18
-            start1 = datetime(year, 4, 1)
-            end1 = datetime(year, 9, 18, 23, 59, 59)
+            start1 = datetime(fiscal_year, 4, 1)
+            end1 = datetime(fiscal_year, 9, 18, 23, 59, 59)
             # 9/19～翌年3/31
-            start2 = datetime(year, 9, 19)
-            end2 = datetime(year + 1, 3, 31, 23, 59, 59)
+            start2 = datetime(fiscal_year, 9, 19)
+            end2 = datetime(fiscal_year + 1, 3, 31, 23, 59, 59)
             t1_9_17, t1_other = calc_total_time_split(card_id, start1, end1)
             t2_9_17, t2_other = calc_total_time_split(card_id, start2, end2)
             # 名前・オフセット取得
