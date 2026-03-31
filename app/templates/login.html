@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card" style="max-width:480px;margin:0 auto;">
+  <h1>管理者ログイン</h1>
+  {% if error %}
+  <p class="alert">{{ error }}</p>
+  {% endif %}
+  <h2>カードタッチログイン</h2>
+  <form method="post" action="/login/touch">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>カードID <input name="card_id" required></label>
+    <div class="actions">
+      <button class="btn" type="submit">タッチでログイン</button>
+      <a class="btn btn-secondary" href="/">戻る</a>
+    </div>
+  </form>
+
+  <hr>
+  <h2>ID/パスワードログイン</h2>
+  <form method="post" action="/login">
+    <input type="hidden" name="next" value="{{ next }}">
+    <label>ユーザー名 <input name="username" required></label>
+    <label>パスワード <input type="password" name="password" required></label>
+    <div class="actions">
+      <button class="btn" type="submit">ログイン</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

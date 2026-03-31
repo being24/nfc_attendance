@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card hero">
+  <h1>学生証をタッチしてください</h1>
+  <p>この画面は打刻待受です。readerプロセスからのAPI連携で更新されます。</p>
+  <div class="actions">
+    <a class="btn" href="/admin/today">管理画面へ</a>
+  </div>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h2>ダミータッチ（実機なし検証用）</h2>
+  <form method="post" action="/touch/simulate">
+    <label>カードID <input name="card_id" required></label>
+    <label>操作
+      <select name="action">
+        <option value="auto">auto（許可された先頭）</option>
+        {% for a in action_options %}
+        <option value="{{ a }}">{{ a }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div class="actions">
+      <button class="btn" type="submit">送信</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

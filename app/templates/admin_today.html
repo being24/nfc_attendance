@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>本日在室一覧</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>学籍番号</th>
+        <th>氏名</th>
+        <th>入室時刻</th>
+        <th>状態</th>
+        <th>累計在室時間(分)</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in in_room %}
+      <tr>
+        <td>{{ row.student_code }}</td>
+        <td>{{ row.name }}</td>
+        <td>{{ row.entered_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+        <td>{{ row.current_status }}</td>
+        <td>{{ row.cumulative_minutes }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5">在室者はいません</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

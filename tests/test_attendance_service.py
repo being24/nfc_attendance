@@ -1,0 +1,83 @@
+from datetime import timedelta
+
+import pytest
+
+from app.domain.enums import AttendanceAction, AttendanceStatus
+from app.domain.time_utils import now_jst
+from app.schemas.student import StudentCreate
+from app.services.attendance_service import AttendanceService
+from app.services.exceptions import (
+    TouchTokenExpiredError,
+    UnknownCardError,
+)
+from app.services.student_service import StudentService
+
+
+def test_prepare_touch_unknown_card(db_session):
+    svc = AttendanceService(db_session)
+    with pytest.raises(UnknownCardError):
+        svc.prepare_touch("NOPE", "reader", now_jst())
+
+
+def test_attendance_flow_and_lock_alert(db_session):
+    student = StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
+    svc = AttendanceService(db_session)
+    t1 = now_jst().replace(hour=9, minute=0, second=0, microsecond=0)
+
+    p = svc.prepare_touch("CARD1", "reader", t1)
+    assert p.current_status == AttendanceStatus.OUTSIDE
+    c1 = svc.confirm_touch(p.touch_token, AttendanceAction.ENTER, t1)
+    assert c1.next_status == AttendanceStatus.IN_ROOM
+
+    p2 = svc.prepare_touch("CARD1", "reader", t1 + timedelta(minutes=60))
+    svc.confirm_touch(p2.touch_token, AttendanceAction.LEAVE_TEMP, t1 + timedelta(minutes=60))
+
+    p3 = svc.prepare_touch("CARD1", "reader", t1 + timedelta(minutes=75))
+    svc.confirm_touch(p3.touch_token, AttendanceAction.RETURN, t1 + timedelta(minutes=75))
+
+    p4 = svc.prepare_touch("CARD1", "reader", t1 + timedelta(minutes=120))
+    c4 = svc.confirm_touch(p4.touch_token, AttendanceAction.LEAVE_FINAL, t1 + timedelta(minutes=120))
+    assert c4.lock_alert_required is True
+    assert c4.student_id == student.id
+
+
+def test_token_expiry(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
+    svc = AttendanceService(db_session)
+    t = now_jst()
+    p = svc.prepare_touch("CARD1", "reader", t)
+    with pytest.raises(TouchTokenExpiredError):
+        svc.confirm_touch(p.touch_token, AttendanceAction.ENTER, t + timedelta(seconds=25))
+
+
+def test_compute_9_to_17(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
+    svc = AttendanceService(db_session)
+    start = now_jst().replace(hour=8, minute=0, second=0, microsecond=0)
+    p = svc.prepare_touch("CARD1", "reader", start)
+    svc.confirm_touch(p.touch_token, AttendanceAction.ENTER, start)
+
+    p2 = svc.prepare_touch("CARD1", "reader", start + timedelta(hours=2))
+    svc.confirm_touch(p2.touch_token, AttendanceAction.LEAVE_TEMP, start + timedelta(hours=2))
+
+    p3 = svc.prepare_touch("CARD1", "reader", start + timedelta(hours=3))
+    svc.confirm_touch(p3.touch_token, AttendanceAction.RETURN, start + timedelta(hours=3))
+
+    repo_open = svc.att_repo.get_open_session(1)
+    business = svc.compute_9_to_17_minutes(start, start + timedelta(hours=10), repo_open.id)
+    assert business == 420  # 9:00-17:00(480) - break 60
+
+
+def test_get_today_attendance_fields(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
+    svc = AttendanceService(db_session)
+    t = now_jst()
+    p = svc.prepare_touch("CARD1", "reader", t)
+    svc.confirm_touch(p.touch_token, AttendanceAction.ENTER, t)
+
+    today = svc.get_today_attendance()
+    assert len(today.in_room) == 1
+    row = today.in_room[0]
+    assert row.student_code == "S001"
+    assert row.name == "Alice"
+    assert row.current_status == AttendanceStatus.IN_ROOM.value

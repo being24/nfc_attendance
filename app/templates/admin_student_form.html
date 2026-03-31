@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>{{ "学生登録" if form_mode == "create" else "学生編集" }}</h1>
+  {% if error %}
+  <p class="alert">{{ error }}</p>
+  {% endif %}
+  <form method="post" action="{{ '/admin/students' if form_mode == 'create' else '/admin/students/' ~ student.id }}">
+    {% if form_mode == "create" %}
+    <label>学籍番号 <input name="student_code" required></label>
+    {% else %}
+    <label>学籍番号 <input value="{{ student.student_code }}" disabled></label>
+    {% endif %}
+
+    <label>氏名 <input name="name" value="{{ student.name if student else '' }}" required></label>
+    <label>カードID <input name="card_id" value="{{ student.card_id if student else '' }}" required></label>
+    <label>備考 <textarea name="note">{{ student.note if student and student.note else '' }}</textarea></label>
+
+    {% if form_mode == "edit" %}
+    <label><input type="checkbox" name="is_active" value="true" {% if student.is_active %}checked{% endif %}> 有効</label>
+    {% endif %}
+
+    <div class="actions">
+      <button class="btn" type="submit">保存</button>
+      <a class="btn btn-secondary" href="/admin/students">戻る</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

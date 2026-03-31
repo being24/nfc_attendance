@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>学生一覧</h1>
+  <div class="actions">
+    <a class="btn" href="/admin/students/new">新規登録</a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>学籍番号</th>
+        <th>氏名</th>
+        <th>カードID</th>
+        <th>有効</th>
+        <th>操作</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in students %}
+      <tr>
+        <td>{{ s.id }}</td>
+        <td>{{ s.student_code }}</td>
+        <td>{{ s.name }}</td>
+        <td>{{ s.card_id }}</td>
+        <td>{{ "有効" if s.is_active else "無効" }}</td>
+        <td><a href="/admin/students/{{ s.id }}/edit">編集</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6">データがありません</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endblock %}

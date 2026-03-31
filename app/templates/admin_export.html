@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>CSV出力</h1>
+  <form method="get" action="/api/export/monthly.csv">
+    <label>年 <input type="number" name="year" min="2000" max="2100" value="{{ year }}" required></label>
+    <label>月 <input type="number" name="month" min="1" max="12" value="{{ month }}" required></label>
+    <div class="actions">
+      <button class="btn" type="submit">ダウンロード</button>
+    </div>
+  </form>
+</section>
+{% endblock %}
