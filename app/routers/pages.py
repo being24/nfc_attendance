@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -117,6 +115,30 @@ def touch_result_page(
             "title": title,
             "message": message,
             "lock_alert_required": lock_alert_required,
+        },
+    )
+
+
+@router.post("/student/term-total", response_class=HTMLResponse)
+def student_term_total_page(
+    request: Request,
+    card_id: str = Form(...),
+    attendance_service: AttendanceService = Depends(get_attendance_service),
+):
+    student, total_minutes, start, end = attendance_service.get_current_term_total_minutes_by_card(card_id=card_id, now=now_jst())
+    hours = total_minutes // 60
+    minutes = total_minutes % 60
+    period = f"{start.strftime('%Y-%m-%d')} 〜 {end.strftime('%Y-%m-%d')}"
+    return templates.TemplateResponse(
+        request,
+        "touch_result.html",
+        {
+            "title": "今期通算在室時間",
+            "message": (
+                f"{student.student_code} {student.name} の今期通算在室時間: "
+                f"{hours}時間{minutes}分（{total_minutes}分） / 期間: {period}"
+            ),
+            "lock_alert_required": False,
         },
     )
 
@@ -299,7 +321,9 @@ def admin_export_page(request: Request):
     redirect = require_admin_page_auth(request)
     if redirect:
         return redirect
-    now = datetime.now()
+    now = now_jst()
+    semester_year = now.year if now.month >= 4 else now.year - 1
+    semester = 1 if 4 <= now.month <= 9 else 2
     return templates.TemplateResponse(
         request,
         "admin_export.html",
@@ -307,5 +331,7 @@ def admin_export_page(request: Request):
             "title": "CSV出力",
             "year": now.year,
             "month": now.month,
+            "semester_year": semester_year,
+            "semester": semester,
         },
     )

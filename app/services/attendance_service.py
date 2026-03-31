@@ -10,6 +10,8 @@ from app.domain.time_utils import ensure_jst, from_unix_seconds, minutes_between
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.student_repository import StudentRepository
 from app.repositories.unknown_card_repository import UnknownCardRepository
+from app.models.attendance_session import AttendanceSession
+from app.models.student import Student
 from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, TodayAttendanceResponse
 from app.schemas.reader import ReaderTouchConfirmResponse, ReaderTouchResponse
 from app.services.audit_service import AuditService
@@ -148,6 +150,65 @@ class AttendanceService:
         gross = minutes_between(entered, left)
         break_minutes = self.att_repo.sum_break_minutes(session_id=session_id, until=left)
         return max(0, gross - break_minutes)
+
+    def _compute_net_minutes_for_period(
+        self,
+        session: AttendanceSession,
+        period_start: datetime,
+        period_end: datetime,
+        now: datetime,
+    ) -> int:
+        session_start = from_unix_seconds(session.entered_at)
+        session_end = from_unix_seconds(session.left_at) if session.left_at is not None else ensure_jst(now)
+        overlap_start = max(session_start, ensure_jst(period_start))
+        overlap_end = min(session_end, ensure_jst(period_end))
+        if overlap_end <= overlap_start:
+            return 0
+
+        gross = minutes_between(overlap_start, overlap_end)
+        break_minutes = 0
+        for bp in self.att_repo.list_breaks(session.id):
+            bp_start = from_unix_seconds(bp.started_at)
+            bp_end = from_unix_seconds(bp.ended_at) if bp.ended_at is not None else session_end
+            b_start = max(bp_start, overlap_start)
+            b_end = min(bp_end, overlap_end)
+            if b_end > b_start:
+                break_minutes += minutes_between(b_start, b_end)
+        return max(0, gross - break_minutes)
+
+    def current_term_bounds(self, now: datetime | None = None) -> tuple[datetime, datetime]:
+        base = ensure_jst(now or now_jst())
+        y = base.year
+        m = base.month
+        if 4 <= m <= 9:
+            return (
+                base.replace(year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0),
+                base.replace(year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0),
+            )
+        if m >= 10:
+            return (
+                base.replace(year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0),
+                base.replace(year=y + 1, month=4, day=1, hour=0, minute=0, second=0, microsecond=0),
+            )
+        return (
+            base.replace(year=y - 1, month=10, day=1, hour=0, minute=0, second=0, microsecond=0),
+            base.replace(year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0),
+        )
+
+    def get_current_term_total_minutes_by_card(
+        self,
+        card_id: str,
+        now: datetime | None = None,
+    ) -> tuple[Student, int, datetime, datetime]:
+        student = self.student_repo.get_by_card_id(card_id)
+        if student is None:
+            raise UnknownCardError("未登録のカードです")
+
+        current = ensure_jst(now or now_jst())
+        start, end = self.current_term_bounds(current)
+        sessions = self.att_repo.list_sessions_overlapping_period(student.id, start, end)
+        total = sum(self._compute_net_minutes_for_period(s, start, end, current) for s in sessions)
+        return student, total, start, min(end, current)
 
     def compute_9_to_17_minutes(self, entered_at: datetime, left_at: datetime, session_id: int) -> int:
         entered = ensure_jst(entered_at)

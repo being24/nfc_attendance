@@ -44,3 +44,25 @@ def test_simulate_touch_success_page(client):
     )
     assert res.status_code == 200
     assert "打刻完了" in res.text
+
+
+def test_term_total_page(client):
+    client.post(
+        "/api/students",
+        json={"student_code": "S901", "name": "Term User", "card_id": "CARD901"},
+    )
+    client.post(
+        "/touch/simulate",
+        data={"card_id": "CARD901", "action": "ENTER"},
+    )
+    client.post(
+        "/touch/simulate",
+        data={"card_id": "CARD901", "action": "LEAVE_FINAL"},
+    )
+
+    res = client.post(
+        "/student/term-total",
+        data={"card_id": "CARD901"},
+    )
+    assert res.status_code == 200
+    assert "今期通算在室時間" in res.text

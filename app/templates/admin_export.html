@@ -1,10 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
-  <h1>CSV出力</h1>
+  <h1>CSV出力（月次）</h1>
   <form method="get" action="/api/export/monthly.csv">
     <label>年 <input type="number" name="year" min="2000" max="2100" value="{{ year }}" required></label>
     <label>月 <input type="number" name="month" min="1" max="12" value="{{ month }}" required></label>
+    <div class="actions">
+      <button class="btn" type="submit">ダウンロード</button>
+    </div>
+  </form>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
+  <h1>CSV出力（半期）</h1>
+  <form method="get" action="/api/export/semester.csv">
+    <label>年度（開始年） <input type="number" name="year" min="2000" max="2100" value="{{ semester_year }}" required></label>
+    <label>半期
+      <select name="semester">
+        <option value="1" {% if semester == 1 %}selected{% endif %}>前期（4月-9月）</option>
+        <option value="2" {% if semester == 2 %}selected{% endif %}>後期（10月-翌3月）</option>
+      </select>
+    </label>
     <div class="actions">
       <button class="btn" type="submit">ダウンロード</button>
     </div>
