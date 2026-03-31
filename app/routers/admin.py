@@ -9,7 +9,7 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 
 def require_admin_api_auth(request: Request) -> None:
     if not request.session.get("admin_authenticated"):
-        raise HTTPException(status_code=401, detail="admin login required")
+        raise HTTPException(status_code=401, detail="管理者ログインが必要です")
 
 
 @router.post("/corrections")

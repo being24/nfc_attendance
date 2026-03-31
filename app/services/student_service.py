@@ -26,23 +26,23 @@ class StudentService:
         except IntegrityError as e:
             msg = str(e.orig).lower() if getattr(e, "orig", None) else str(e).lower()
             if "student_code" in msg:
-                raise DuplicateStudentCodeError("duplicate student_code") from e
+                raise DuplicateStudentCodeError("学籍番号が重複しています") from e
             if "card_id" in msg:
-                raise DuplicateCardIdError("duplicate card_id") from e
+                raise DuplicateCardIdError("カードIDが重複しています") from e
             raise
 
     def update_student(self, student_id: int, payload: StudentUpdate) -> Student:
         student = self.repo.get_by_id(student_id)
         if student is None:
-            raise StudentNotFoundError(f"student not found: {student_id}")
+            raise StudentNotFoundError(f"学生が見つかりません: {student_id}")
         try:
             return self.repo.update(student, **payload.model_dump(exclude_unset=True))
         except IntegrityError as e:
             msg = str(e.orig).lower() if getattr(e, "orig", None) else str(e).lower()
             if "student_code" in msg:
-                raise DuplicateStudentCodeError("duplicate student_code") from e
+                raise DuplicateStudentCodeError("学籍番号が重複しています") from e
             if "card_id" in msg:
-                raise DuplicateCardIdError("duplicate card_id") from e
+                raise DuplicateCardIdError("カードIDが重複しています") from e
             raise
 
     def list_students(self, include_inactive: bool = False) -> list[Student]:
@@ -51,11 +51,11 @@ class StudentService:
     def get_student(self, student_id: int) -> Student:
         student = self.repo.get_by_id(student_id)
         if student is None:
-            raise StudentNotFoundError(f"student not found: {student_id}")
+            raise StudentNotFoundError(f"学生が見つかりません: {student_id}")
         return student
 
     def deactivate_student(self, student_id: int) -> Student:
         student = self.repo.get_by_id(student_id)
         if student is None:
-            raise StudentNotFoundError(f"student not found: {student_id}")
+            raise StudentNotFoundError(f"学生が見つかりません: {student_id}")
         return self.repo.deactivate(student)

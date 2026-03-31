@@ -20,6 +20,24 @@ from app.services.student_service import StudentService
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory="app/templates")
 
+ACTION_LABELS = {
+    AttendanceAction.ENTER.value: "入室",
+    AttendanceAction.LEAVE_TEMP.value: "一時退出",
+    AttendanceAction.RETURN.value: "再入室",
+    AttendanceAction.LEAVE_FINAL.value: "最終退出",
+}
+
+STATUS_LABELS = {
+    "OUTSIDE": "室外",
+    "IN_ROOM": "在室",
+    "OUT_ON_BREAK": "一時退出中",
+}
+
+SOURCE_LABELS = {
+    "reader": "リーダー",
+    "admin_correction": "管理者補正",
+}
+
 
 def require_admin_page_auth(request: Request):
     if not request.session.get("admin_authenticated"):
@@ -55,18 +73,20 @@ def simulate_touch(
     allowed = [a.value for a in touch.allowed_actions]
     chosen = allowed[0] if action == "auto" else action
     if chosen not in allowed:
-        raise InvalidActionError(f"action is not allowed. allowed={allowed}")
+        raise InvalidActionError(f"許可されていない操作です（許可: {', '.join(allowed)}）")
     confirm = attendance_service.confirm_touch(
         touch_token=touch.touch_token,
         action=AttendanceAction(chosen),
         now=now_jst(),
     )
+    chosen_label = ACTION_LABELS.get(chosen, chosen)
+    next_status_label = STATUS_LABELS.get(confirm.next_status.value, confirm.next_status.value)
     return templates.TemplateResponse(
         request,
         "touch_result.html",
         {
             "title": "打刻完了",
-            "message": f"カード {card_id} を {chosen} で処理しました（次状態: {confirm.next_status.value}）",
+            "message": f"カード {card_id} を「{chosen_label}」で処理しました（次状態: {next_status_label}）",
             "lock_alert_required": confirm.lock_alert_required,
         },
     )
@@ -112,6 +132,7 @@ def admin_today_page(
         {
             "title": "本日在室一覧",
             "in_room": today.in_room,
+            "status_labels": STATUS_LABELS,
         },
     )
 
@@ -266,6 +287,8 @@ def admin_events_page(
         {
             "title": "本日イベント一覧",
             "events": today.events,
+            "event_type_labels": ACTION_LABELS,
+            "source_labels": SOURCE_LABELS,
         },
     )
 

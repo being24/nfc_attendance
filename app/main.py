@@ -20,7 +20,7 @@ from app.routers import (
     students_router,
 )
 
-app = FastAPI(title="NFC Attendance API")
+app = FastAPI(title="NFC出欠管理 API")
 settings = get_settings()
 app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key)
 

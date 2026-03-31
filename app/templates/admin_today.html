@@ -18,7 +18,7 @@
         <td>{{ row.student_code }}</td>
         <td>{{ row.name }}</td>
         <td>{{ row.entered_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td>{{ row.current_status }}</td>
+        <td>{{ status_labels.get(row.current_status, row.current_status) }}</td>
         <td>{{ row.cumulative_minutes }}</td>
       </tr>
       {% else %}

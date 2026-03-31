@@ -17,9 +17,9 @@
       <tr>
         <td>{{ e.id }}</td>
         <td>{{ e.student_id }}</td>
-        <td>{{ e.event_type }}</td>
+        <td>{{ event_type_labels.get(e.event_type, e.event_type) }}</td>
         <td>{{ e.occurred_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td>{{ e.source }}</td>
+        <td>{{ source_labels.get(e.source, e.source) }}</td>
       </tr>
       {% else %}
       <tr><td colspan="5">イベントがありません</td></tr>

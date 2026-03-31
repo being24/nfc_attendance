@@ -76,15 +76,15 @@ class AttendanceService:
     def confirm_touch(self, touch_token: str, action: AttendanceAction, now: datetime | None = None) -> ReaderTouchConfirmResponse:
         pending = self._pending_touches.get(touch_token)
         if pending is None:
-            raise TouchTokenNotFoundError("touch token not found")
+            raise TouchTokenNotFoundError("タッチトークンが見つかりません")
 
         now = now or now_jst()
         if pending.is_expired(now):
             self._pending_touches.pop(touch_token, None)
-            raise TouchTokenExpiredError("touch token expired")
+            raise TouchTokenExpiredError("タッチトークンの有効期限が切れています")
 
         if action not in pending.allowed_actions:
-            raise InvalidActionError("action is not allowed")
+            raise InvalidActionError("許可されていない操作です")
 
         try:
             new_status = next_state(pending.current_status, action)

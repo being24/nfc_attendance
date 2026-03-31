@@ -30,7 +30,7 @@ def map_service_error(err: ServiceError) -> tuple[int, str]:
         return 410, str(err)
     if isinstance(err, InvalidActionError):
         return 400, str(err)
-    return 500, "internal service error"
+    return 500, "内部サービスエラー"
 
 
 def install_exception_handlers(app):
@@ -52,7 +52,7 @@ def install_exception_handlers(app):
     @app.exception_handler(Exception)
     async def fallback_error_handler(request: Request, exc: Exception):
         if request.url.path.startswith("/api/"):
-            return JSONResponse(status_code=500, content={"detail": "internal server error"})
+            return JSONResponse(status_code=500, content={"detail": "内部サーバーエラー"})
         return templates.TemplateResponse(
             request,
             "error.html",

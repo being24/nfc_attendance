@@ -38,4 +38,4 @@ def test_service_error_mapped_to_html(client, db_session):
         },
     )
     assert res.status_code == 409
-    assert "duplicate student_code" in res.text
+    assert "学籍番号が重複しています" in res.text

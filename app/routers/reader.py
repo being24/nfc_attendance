@@ -16,7 +16,7 @@ settings = get_settings()
 
 def require_reader_token(x_reader_token: str = Header(alias="X-Reader-Token")) -> None:
     if x_reader_token != settings.reader_token:
-        raise HTTPException(status_code=401, detail="invalid reader token")
+        raise HTTPException(status_code=401, detail="リーダートークンが無効です")
 
 
 @router.post("/touches", response_model=ReaderTouchResponse, dependencies=[Depends(require_reader_token)])
