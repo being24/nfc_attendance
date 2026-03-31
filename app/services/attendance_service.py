@@ -130,7 +130,7 @@ class AttendanceService:
                     action="LOCK_ALERT",
                     target_type="student",
                     target_id=pending.student_id,
-                    detail={"message": "最終退出者です。施錠してください"},
+                    detail={"message": "在室者が0人になりました。施錠してください"},
                 )
 
         self._pending_touches.pop(touch_token, None)

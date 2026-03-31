@@ -24,7 +24,7 @@ ACTION_LABELS = {
     AttendanceAction.ENTER.value: "入室",
     AttendanceAction.LEAVE_TEMP.value: "一時退出",
     AttendanceAction.RETURN.value: "再入室",
-    AttendanceAction.LEAVE_FINAL.value: "最終退出",
+    AttendanceAction.LEAVE_FINAL.value: "退出",
 }
 
 STATUS_LABELS = {
@@ -57,8 +57,9 @@ def index_page(request: Request):
     )
 
 
+@router.post("/touch/manual", response_class=HTMLResponse)
 @router.post("/touch/simulate", response_class=HTMLResponse)
-def simulate_touch(
+def manual_touch(
     request: Request,
     card_id: str = Form(...),
     action: str = Form("auto"),
@@ -67,7 +68,7 @@ def simulate_touch(
     now = now_jst()
     touch = attendance_service.prepare_touch(
         card_id=card_id,
-        reader_name="web-simulated-reader",
+        reader_name="web-touch-panel",
         detected_at=now,
     )
     allowed = [a.value for a in touch.allowed_actions]
