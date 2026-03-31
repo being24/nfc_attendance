@@ -1,6 +1,6 @@
 
 def test_admin_page_requires_login(client):
-    res = client.get("/admin/today", follow_redirects=False)
+    res = client.get("/admin/students", follow_redirects=False)
     assert res.status_code == 303
     assert res.headers["location"].startswith("/login")
 
@@ -22,7 +22,9 @@ def test_login_success_and_logout(client):
     assert logout_res.headers["location"] == "/login"
 
     after_logout = client.get("/admin/today", follow_redirects=False)
-    assert after_logout.status_code == 303
+    assert after_logout.status_code == 200
+    protected_after_logout = client.get("/admin/students", follow_redirects=False)
+    assert protected_after_logout.status_code == 303
 
 
 def test_login_failure(client):

@@ -30,7 +30,7 @@ def test_simulate_touch_unknown_card_shows_error_page(client):
         data={"card_id": "NO_CARD", "action": "auto"},
     )
     assert res.status_code == 404
-    assert "unknown card" in res.text
+    assert "未登録のカードです" in res.text
 
 
 def test_simulate_touch_success_page(client):

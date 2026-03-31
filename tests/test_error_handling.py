@@ -14,7 +14,7 @@ def test_service_error_mapped_to_json(client):
         },
     )
     assert res.status_code == 404
-    assert res.json()["detail"] == "unknown card"
+    assert res.json()["detail"] == "未登録のカードです"
 
 
 def test_service_error_mapped_to_html(client, db_session):

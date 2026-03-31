@@ -105,9 +105,6 @@ def admin_today_page(
     request: Request,
     attendance_service: AttendanceService = Depends(get_attendance_service),
 ):
-    redirect = require_admin_page_auth(request)
-    if redirect:
-        return redirect
     today = attendance_service.get_today_attendance()
     return templates.TemplateResponse(
         request,
