@@ -44,9 +44,9 @@ class AttendanceService:
         student = self.student_repo.get_by_card_id(card_id)
         if student is None:
             self.unknown_repo.create(card_id=card_id, reader_name=reader_name, detected_at=detected_at)
-            raise UnknownCardError("unknown card")
+            raise UnknownCardError("未登録のカードです")
         if not student.is_active:
-            raise InactiveStudentError("inactive student")
+            raise InactiveStudentError("非アクティブな学生です")
 
         current_status = self._get_current_status(student.id)
         allowed_actions = get_allowed_actions(current_status)
