@@ -44,13 +44,20 @@ def require_admin_page_auth(request: Request):
 
 
 @router.get("/", response_class=HTMLResponse)
-def index_page(request: Request):
+def index_page(
+    request: Request,
+    attendance_service: AttendanceService = Depends(get_attendance_service),
+):
+    today = attendance_service.get_today_attendance()
     return templates.TemplateResponse(
         request,
         "index.html",
         {
             "title": "打刻待受",
             "action_options": [a.value for a in AttendanceAction],
+            "in_room": today.in_room,
+            "recent_events": today.events[:5],
+            "event_type_labels": ACTION_LABELS,
         },
     )
 

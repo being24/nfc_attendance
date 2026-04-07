@@ -81,3 +81,26 @@ def test_get_today_attendance_fields(db_session):
     assert row.student_code == "S001"
     assert row.name == "Alice"
     assert row.current_status == AttendanceStatus.IN_ROOM.value
+    assert len(today.events) == 1
+    event = today.events[0]
+    assert event.student_code == "S001"
+    assert event.student_name == "Alice"
+
+
+def test_get_today_attendance_events_are_latest_first(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
+    svc = AttendanceService(db_session)
+    t = now_jst().replace(hour=9, minute=0, second=0, microsecond=0)
+
+    p1 = svc.prepare_touch("CARD1", "reader", t)
+    svc.confirm_touch(p1.touch_token, AttendanceAction.ENTER, t)
+
+    later = t + timedelta(minutes=30)
+    p2 = svc.prepare_touch("CARD1", "reader", later)
+    svc.confirm_touch(p2.touch_token, AttendanceAction.LEAVE_FINAL, later)
+
+    today = svc.get_today_attendance()
+    assert [event.event_type for event in today.events] == [
+        AttendanceAction.LEAVE_FINAL.value,
+        AttendanceAction.ENTER.value,
+    ]

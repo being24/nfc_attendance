@@ -124,17 +124,18 @@ class AttendanceRepository:
             total += minutes_between(start, end)
         return total
 
-    def list_today_events(self, target_day: date) -> list[AttendanceEvent]:
+    def list_today_events(self, target_day: date) -> list[tuple[AttendanceEvent, Student]]:
         start = datetime.combine(target_day, datetime.min.time())
         end = datetime.combine(target_day, datetime.max.time())
         start_ts = to_unix_seconds(start)
         end_ts = to_unix_seconds(end)
         stmt = (
-            select(AttendanceEvent)
+            select(AttendanceEvent, Student)
+            .join(Student, Student.id == AttendanceEvent.student_id)
             .where(and_(AttendanceEvent.occurred_at >= start_ts, AttendanceEvent.occurred_at <= end_ts))
-            .order_by(AttendanceEvent.occurred_at)
+            .order_by(AttendanceEvent.occurred_at.desc(), AttendanceEvent.id.desc())
         )
-        return list(self.db.scalars(stmt).all())
+        return list(self.db.execute(stmt).all())
 
     def count_in_room(self) -> int:
         stmt = select(func.count(AttendanceStatusModel.student_id)).where(AttendanceStatusModel.current_status == AttendanceStatus.IN_ROOM.value)
@@ -146,7 +147,7 @@ class AttendanceRepository:
             .join(AttendanceStatusModel, AttendanceStatusModel.student_id == Student.id)
             .join(AttendanceSession, and_(AttendanceSession.student_id == Student.id, AttendanceSession.left_at.is_(None)))
             .where(AttendanceStatusModel.current_status == AttendanceStatus.IN_ROOM.value)
-            .order_by(Student.id)
+            .order_by(Student.name, Student.student_code, Student.id)
         )
         return list(self.db.execute(stmt).all())
 

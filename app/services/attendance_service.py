@@ -258,11 +258,13 @@ class AttendanceService:
             AttendanceEventResponse(
                 id=e.id,
                 student_id=e.student_id,
+                student_code=student.student_code,
+                student_name=student.name,
                 event_type=e.event_type,
                 occurred_at=from_unix_seconds(e.occurred_at),
                 source=e.source,
             )
-            for e in self.att_repo.list_today_events(now.date())
+            for e, student in self.att_repo.list_today_events(now.date())
         ]
 
         return TodayAttendanceResponse(in_room=in_room, events=events)

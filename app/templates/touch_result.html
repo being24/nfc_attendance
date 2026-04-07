@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% block content %}
+<meta http-equiv="refresh" content="5;url=/">
 <section class="card">
   <h1>{{ title }}</h1>
   <p>{{ message }}</p>
   {% if lock_alert_required %}
   <p class="alert">在室者が0人になりました。施錠してください。</p>
   {% endif %}
+  <p>5秒後に待受画面へ戻ります。</p>
   <a class="btn" href="/">待受に戻る</a>
 </section>
 {% endblock %}

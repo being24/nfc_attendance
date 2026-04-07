@@ -8,6 +8,9 @@ FastAPI + Jinja2/HTMX + SQLAlchemy + SQLite で実装した、NFC勤怠管理シ
 uv sync
 ```
 
+プロジェクト直下の `.env` は起動時に自動で読み込まれます。
+必要に応じて `.env.example` をコピーして `.env` を作成してください。
+
 ## 起動方法
 
 ### FastAPIサーバ
@@ -41,7 +44,9 @@ uv run python -m pytest -q
 ## 環境変数
 
 - `DATABASE_URL`（default: `sqlite:///./attendance.db`）
+- `API_BASE_URL`（default: `http://127.0.0.1:8000`、reader用）
 - `READER_TOKEN`（default: `dev-reader-token`）
+- `READER_NAME`（default: `dummy-reader`、reader用）
 - `SESSION_SECRET_KEY`（default: `dev-session-secret`）
 - `ADMIN_USERNAME`（default: `admin`）
 - `ADMIN_PASSWORD`（default: `admin`）

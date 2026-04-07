@@ -1,6 +1,11 @@
 import os
 from dataclasses import dataclass
 
+from app.env import load_project_dotenv
+
+
+load_project_dotenv()
+
 
 @dataclass(frozen=True)
 class Settings:

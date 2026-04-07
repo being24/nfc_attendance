@@ -1,8 +1,20 @@
 
 def test_index_page(client):
+    client.post(
+        "/api/students",
+        json={"student_code": "S100", "name": "Alice", "card_id": "CARD100"},
+    )
+    client.post(
+        "/touch/simulate",
+        data={"card_id": "CARD100", "action": "ENTER"},
+    )
     res = client.get("/")
     assert res.status_code == 200
     assert "学生証をタッチしてください" in res.text
+    assert "現在の在室者" in res.text
+    assert "直近の入退室ログ" in res.text
+    assert "Alice" in res.text
+    assert "1名在室中" in res.text
 
 
 def test_admin_pages(client):
@@ -44,6 +56,7 @@ def test_simulate_touch_success_page(client):
     )
     assert res.status_code == 200
     assert "打刻完了" in res.text
+    assert "5秒後に待受画面へ戻ります。" in res.text
 
 
 def test_term_total_page(client):

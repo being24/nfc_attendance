@@ -6,6 +6,8 @@ from pydantic import BaseModel
 class AttendanceEventResponse(BaseModel):
     id: int
     student_id: int
+    student_code: str
+    student_name: str
     event_type: str
     occurred_at: datetime
     source: str
