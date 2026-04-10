@@ -1,0 +1,16 @@
+[Unit]
+Description=NFC Attendance Reader
+After=network.target nfc-attendance-web.service
+Wants=nfc-attendance-web.service
+
+[Service]
+Type=simple
+User=being
+WorkingDirectory=/home/being/programs/nfc_attendance
+EnvironmentFile=/home/being/programs/nfc_attendance/.env
+ExecStart=/home/being/.local/bin/uv run python -m reader.main
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
