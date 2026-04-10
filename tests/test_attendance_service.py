@@ -164,6 +164,26 @@ def test_get_today_attendance_includes_recent_lock_alert(db_session):
     assert "施錠してください" in today.lock_alert.message
 
 
+def test_get_today_attendance_hides_lock_alert_when_someone_is_in_room(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S010", name="Lock User", card_id="LOCK1"))
+    StudentService(db_session).register_student(StudentCreate(student_code="S011", name="Stay User", card_id="LOCK2"))
+    svc = AttendanceService(db_session)
+    entered_at = now_jst() - timedelta(minutes=10)
+
+    pending = svc.prepare_touch("LOCK1", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+    pending = svc.prepare_touch("LOCK2", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+
+    leaving_at = now_jst()
+    pending = svc.prepare_touch("LOCK1", "reader", leaving_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, leaving_at)
+
+    today = svc.get_today_attendance()
+
+    assert today.lock_alert is None
+
+
 def test_get_today_attendance_includes_touch_panel_error(db_session):
     touch_panel_state.store_error("選択中の操作はこのカードでは使えません", now_jst())
     svc = AttendanceService(db_session)

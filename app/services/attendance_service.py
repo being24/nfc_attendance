@@ -357,6 +357,8 @@ class AttendanceService:
 
     def get_latest_lock_alert(self, now: datetime | None = None) -> LockAlertResponse | None:
         current = ensure_jst(now or now_jst())
+        if self.att_repo.count_in_room() != 0:
+            return None
         latest_audit = self.audit_repo.get_latest_by_action("LOCK_ALERT")
         if latest_audit is None:
             return None
