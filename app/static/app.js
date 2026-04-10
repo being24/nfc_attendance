@@ -20,6 +20,10 @@ let loginCardCapturePollTimerId = null;
 let loginCardCaptureRefreshInFlight = false;
 let lastLoginCaptureKey = null;
 let lastStudentCardCaptureKey = null;
+let dismissedUnknownCardAlertKey = null;
+let dismissedLockAlertKey = null;
+let dismissedTouchErrorAlertKey = null;
+let dismissedTermTotalAlertKey = null;
 
 async function setKioskMode(mode) {
   try {
@@ -174,6 +178,11 @@ function updateUnknownCardAlert(alert) {
     card.classList.add("is-hidden");
     return;
   }
+  const alertKey = `${alert.card_id}:${alert.detected_at}`;
+  if (alertKey === dismissedUnknownCardAlertKey) {
+    card.classList.add("is-hidden");
+    return;
+  }
 
   const readerSuffix = alert.reader_name ? ` / reader: ${escapeHtml(alert.reader_name)}` : "";
   card.innerHTML = `
@@ -182,6 +191,7 @@ function updateUnknownCardAlert(alert) {
   `;
   card.classList.remove("is-hidden");
   unknownCardAlertTimerId = window.setTimeout(() => {
+    dismissedUnknownCardAlertKey = alertKey;
     card.classList.add("is-hidden");
     unknownCardAlertTimerId = null;
   }, UNKNOWN_CARD_ALERT_DURATION_MS);
@@ -202,6 +212,11 @@ function updateLockAlert(alert) {
     card.classList.add("is-hidden");
     return;
   }
+  const alertKey = `${alert.message}:${alert.detected_at}`;
+  if (alertKey === dismissedLockAlertKey) {
+    card.classList.add("is-hidden");
+    return;
+  }
 
   card.innerHTML = `
     <h2>施錠してください</h2>
@@ -209,6 +224,7 @@ function updateLockAlert(alert) {
   `;
   card.classList.remove("is-hidden");
   lockAlertTimerId = window.setTimeout(() => {
+    dismissedLockAlertKey = alertKey;
     card.classList.add("is-hidden");
     lockAlertTimerId = null;
   }, UNKNOWN_CARD_ALERT_DURATION_MS);
@@ -229,6 +245,11 @@ function updateTouchErrorAlert(alert) {
     card.classList.add("is-hidden");
     return;
   }
+  const alertKey = `${alert.message}:${alert.detected_at}`;
+  if (alertKey === dismissedTouchErrorAlertKey) {
+    card.classList.add("is-hidden");
+    return;
+  }
 
   card.innerHTML = `
     <h2>操作できません</h2>
@@ -236,6 +257,7 @@ function updateTouchErrorAlert(alert) {
   `;
   card.classList.remove("is-hidden");
   touchErrorAlertTimerId = window.setTimeout(() => {
+    dismissedTouchErrorAlertKey = alertKey;
     card.classList.add("is-hidden");
     touchErrorAlertTimerId = null;
   }, UNKNOWN_CARD_ALERT_DURATION_MS);
@@ -256,6 +278,11 @@ function updateTermTotalAlert(result) {
     card.classList.add("is-hidden");
     return;
   }
+  const alertKey = `${result.student_code}:${result.total_minutes}:${result.detected_at}`;
+  if (alertKey === dismissedTermTotalAlertKey) {
+    card.classList.add("is-hidden");
+    return;
+  }
 
   const hours = Math.floor((result.total_minutes || 0) / 60);
   const minutes = (result.total_minutes || 0) % 60;
@@ -266,6 +293,7 @@ function updateTermTotalAlert(result) {
   `;
   card.classList.remove("is-hidden");
   termTotalAlertTimerId = window.setTimeout(() => {
+    dismissedTermTotalAlertKey = alertKey;
     card.classList.add("is-hidden");
     termTotalAlertTimerId = null;
   }, UNKNOWN_CARD_ALERT_DURATION_MS);
