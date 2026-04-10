@@ -3,6 +3,7 @@ document.body.addEventListener("htmx:responseError", function () {
 });
 
 const ATTENDANCE_POLL_INTERVAL_MS = 15000;
+const STUDENT_CARD_CAPTURE_POLL_INTERVAL_MS = 1000;
 const UNKNOWN_CARD_ALERT_DURATION_MS = 10000;
 let unknownCardAlertTimerId = null;
 let attendancePollTimerId = null;
@@ -10,6 +11,18 @@ let attendanceRefreshInFlight = false;
 let attendanceEventSource = null;
 let attendanceSseFallbackActive = false;
 let studentCardCaptureEventSource = null;
+let studentCardCapturePollTimerId = null;
+let studentCardCaptureRefreshInFlight = false;
+
+function touchActionLabel(action) {
+  const labels = {
+    ENTER: "入室",
+    LEAVE_TEMP: "一時退出",
+    RETURN: "再入室",
+    LEAVE_FINAL: "退出",
+  };
+  return labels[action] || action;
+}
 
 function escapeHtml(value) {
   return String(value)
@@ -70,13 +83,7 @@ function formatTimestamp(value) {
 }
 
 function eventLabel(eventType) {
-  const labels = {
-    ENTER: "入室",
-    LEAVE_TEMP: "一時退出",
-    RETURN: "再入室",
-    LEAVE_FINAL: "退出",
-  };
-  return labels[eventType] || eventType;
+  return touchActionLabel(eventType);
 }
 
 function updateInRoom(inRoom) {
@@ -157,6 +164,80 @@ function updateUnknownCardAlert(alert) {
   }, UNKNOWN_CARD_ALERT_DURATION_MS);
 }
 
+function updateTouchPanelAction(action) {
+  const status = document.getElementById("touch-action-status");
+  const manualActionInput = document.getElementById("manual-action-input");
+  const buttons = document.querySelectorAll("[data-touch-action]");
+
+  if (status) {
+    status.textContent = `現在の打刻モード: ${touchActionLabel(action)}`;
+  }
+  if (manualActionInput) {
+    manualActionInput.value = action;
+  }
+  buttons.forEach((button) => {
+    if (!(button instanceof HTMLElement)) {
+      return;
+    }
+    button.classList.toggle("is-selected", button.dataset.touchAction === action);
+  });
+}
+
+async function refreshTouchPanelAction() {
+  const status = document.getElementById("touch-action-status");
+  if (!status) {
+    return;
+  }
+
+  try {
+    const response = await window.fetch("/api/attendance/touch-panel/action", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch touch panel action: ${response.status}`);
+    }
+    const payload = await response.json();
+    updateTouchPanelAction(payload.selected_action);
+  } catch (error) {
+    console.warn("Failed to refresh touch panel action", error);
+  }
+}
+
+function initTouchPanelSelector() {
+  const buttons = document.querySelectorAll("[data-touch-action]");
+  if (buttons.length === 0) {
+    return;
+  }
+
+  refreshTouchPanelAction();
+  buttons.forEach((button) => {
+    button.addEventListener("click", async function () {
+      const action = button.dataset.touchAction;
+      if (!action) {
+        return;
+      }
+      try {
+        const response = await window.fetch("/api/attendance/touch-panel/action", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ action }),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to set touch panel action: ${response.status}`);
+        }
+        const payload = await response.json();
+        updateTouchPanelAction(payload.selected_action);
+      } catch (error) {
+        console.warn("Failed to set touch panel action", error);
+      }
+    });
+  });
+}
+
 async function refreshTodayAttendance() {
   if (window.location.pathname !== "/") {
     return;
@@ -232,10 +313,14 @@ function initTopDashboard() {
 async function refreshStudentCardCapture() {
   const cardInput = document.getElementById("student-card-id-input");
   const status = document.getElementById("student-card-capture-status");
-  if (!cardInput || !status || window.location.pathname !== "/admin/students/new") {
+  if (!cardInput || !status) {
+    return;
+  }
+  if (studentCardCaptureRefreshInFlight) {
     return;
   }
 
+  studentCardCaptureRefreshInFlight = true;
   try {
     const response = await window.fetch("/api/admin/latest-unknown-card", {
       headers: { Accept: "application/json" },
@@ -259,15 +344,30 @@ async function refreshStudentCardCapture() {
     status.textContent = `カードを受信しました: ${payload.card_id}${readerSuffix}`;
   } catch (error) {
     console.warn("Failed to refresh student card capture", error);
+  } finally {
+    studentCardCaptureRefreshInFlight = false;
   }
 }
 
+function scheduleStudentCardCaptureRefresh(delayMs = STUDENT_CARD_CAPTURE_POLL_INTERVAL_MS) {
+  if (studentCardCapturePollTimerId !== null) {
+    window.clearTimeout(studentCardCapturePollTimerId);
+  }
+  studentCardCapturePollTimerId = window.setTimeout(async () => {
+    await refreshStudentCardCapture();
+    scheduleStudentCardCaptureRefresh();
+  }, delayMs);
+}
+
 function initStudentCardCapture() {
-  if (window.location.pathname !== "/admin/students/new") {
+  const cardInput = document.getElementById("student-card-id-input");
+  const status = document.getElementById("student-card-capture-status");
+  if (!cardInput || !status) {
     return;
   }
 
   refreshStudentCardCapture();
+  scheduleStudentCardCaptureRefresh();
   if ("EventSource" in window) {
     studentCardCaptureEventSource = new window.EventSource("/api/attendance/stream");
     studentCardCaptureEventSource.onmessage = function () {
@@ -277,8 +377,16 @@ function initStudentCardCapture() {
       console.warn("Student card capture SSE connection failed");
     };
   }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      refreshStudentCardCapture();
+      scheduleStudentCardCaptureRefresh();
+    }
+  });
 }
 
 initCardIdInputFocus();
 initTopDashboard();
 initStudentCardCapture();
+initTouchPanelSelector();

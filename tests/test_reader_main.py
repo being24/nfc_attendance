@@ -64,6 +64,19 @@ def test_resolve_reader_name_prefers_explicit_value():
     assert reader_main.resolve_reader_name(make_args(card_id=None, reader_name="reader-a")) == "reader-a"
 
 
+def test_choose_action_prefers_touch_panel_selection():
+    assert reader_main.choose_action("auto", ["ENTER", "LEAVE_TEMP"], preferred_action="LEAVE_TEMP") == "LEAVE_TEMP"
+
+
+def test_choose_action_rejects_invalid_touch_panel_selection():
+    try:
+        reader_main.choose_action("auto", ["ENTER"], preferred_action="LEAVE_TEMP")
+    except RuntimeError as exc:
+        assert "選択中の操作 LEAVE_TEMP は許可されていません" in str(exc)
+    else:
+        raise AssertionError("RuntimeError was not raised")
+
+
 def test_build_card_event_handler_processes_insert(monkeypatch):
     silence_reader_logger(monkeypatch)
     calls = []

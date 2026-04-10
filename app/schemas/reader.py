@@ -17,6 +17,7 @@ class ReaderTouchResponse(BaseModel):
     student_name: str
     current_status: AttendanceStatus
     allowed_actions: list[AttendanceAction]
+    preferred_action: AttendanceAction | None = None
     expires_at: datetime
 
 

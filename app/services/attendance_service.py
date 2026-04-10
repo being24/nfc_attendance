@@ -11,6 +11,7 @@ from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.student_repository import StudentRepository
 from app.repositories.unknown_card_repository import UnknownCardRepository
 from app.realtime import attendance_event_broker
+from app.touch_panel import touch_panel_state
 from app.models.attendance_session import AttendanceSession
 from app.models.student import Student
 from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, TodayAttendanceResponse
@@ -76,6 +77,7 @@ class AttendanceService:
             student_name=student.name,
             current_status=current_status,
             allowed_actions=allowed_actions,
+            preferred_action=touch_panel_state.get_selected_action(),
             expires_at=pending.expires_at,
         )
 

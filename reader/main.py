@@ -79,10 +79,14 @@ def resolve_reader_name(args: argparse.Namespace) -> str:
     return "real-reader"
 
 
-def choose_action(requested: str, allowed_actions: list[str]) -> str:
+def choose_action(requested: str, allowed_actions: list[str], preferred_action: str | None = None) -> str:
     if requested == "auto":
         if not allowed_actions:
             raise RuntimeError("サーバーから許可操作が返されませんでした")
+        if preferred_action is not None:
+            if preferred_action not in allowed_actions:
+                raise RuntimeError(f"選択中の操作 {preferred_action} は許可されていません（許可: {allowed_actions}）")
+            return preferred_action
         return allowed_actions[0]
     if requested not in allowed_actions:
         raise RuntimeError(f"指定された操作 {requested} は許可されていません（許可: {allowed_actions}）")
@@ -115,7 +119,8 @@ def run_once(client: ReaderApiClient, debouncer: Debouncer, card_id: str, reader
     try:
         touch = client.prepare_touch(card_id=card_id, reader_name=reader_name, detected_at=now)
         allowed = touch.get("allowed_actions", [])
-        chosen = choose_action(action, allowed)
+        preferred_action = touch.get("preferred_action")
+        chosen = choose_action(action, allowed, preferred_action=preferred_action)
         confirm = client.confirm_touch(touch_token=touch["touch_token"], action=chosen, now=datetime.now().astimezone())
     except httpx.HTTPStatusError as exc:
         logger.error(

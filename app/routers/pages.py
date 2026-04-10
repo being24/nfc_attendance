@@ -14,6 +14,7 @@ from app.services.exceptions import (
     StudentNotFoundError,
 )
 from app.services.student_service import StudentService
+from app.touch_panel import touch_panel_state
 
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory="app/templates")
@@ -58,6 +59,7 @@ def index_page(
             "in_room": today.in_room,
             "recent_events": today.events[:5],
             "unknown_card_alert": today.unknown_card_alert,
+            "selected_touch_action": touch_panel_state.get_selected_action().value,
             "event_type_labels": ACTION_LABELS,
         },
     )

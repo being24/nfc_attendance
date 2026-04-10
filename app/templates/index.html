@@ -45,16 +45,19 @@
 
     <section class="card touch-panel">
       <h2>打刻操作</h2>
+      <p id="touch-action-status" class="capture-status">現在の打刻モード: {{ event_type_labels.get(selected_touch_action, selected_touch_action) }}</p>
+      <div class="touch-grid">
+        <button class="btn touch-btn{% if selected_touch_action == 'ENTER' %} is-selected{% endif %}" type="button" data-touch-action="ENTER">入室</button>
+        <button class="btn touch-btn{% if selected_touch_action == 'LEAVE_TEMP' %} is-selected{% endif %}" type="button" data-touch-action="LEAVE_TEMP">一時退出</button>
+        <button class="btn touch-btn{% if selected_touch_action == 'RETURN' %} is-selected{% endif %}" type="button" data-touch-action="RETURN">再入室</button>
+        <button class="btn touch-btn{% if selected_touch_action == 'LEAVE_FINAL' %} is-selected{% endif %}" type="button" data-touch-action="LEAVE_FINAL">退出</button>
+      </div>
       <form method="post" action="/touch/manual">
-        <div class="touch-grid">
-          <button class="btn touch-btn" type="submit" name="action" value="ENTER">入室</button>
-          <button class="btn touch-btn" type="submit" name="action" value="LEAVE_TEMP">一時退出</button>
-          <button class="btn touch-btn" type="submit" name="action" value="RETURN">再入室</button>
-          <button class="btn touch-btn" type="submit" name="action" value="LEAVE_FINAL">退出</button>
-        </div>
         <hr class="touch-divider">
+        <input id="manual-action-input" type="hidden" name="action" value="{{ selected_touch_action }}">
         <label>ダミーID入力欄（必要時のみ）<input id="card-id-input" name="card_id" placeholder="例: DUMMY-CARD-001" autocomplete="off" required></label>
         <div class="actions">
+          <button class="btn" type="submit">ダミー送信</button>
           <button class="btn btn-secondary" type="submit" formaction="/student/term-total">今期の通算在室時間を表示</button>
         </div>
       </form>
