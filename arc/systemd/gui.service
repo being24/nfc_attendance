@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=being
-WorkingDirectory=/home/being/programs/nfc_attendance
-EnvironmentFile=/home/being/programs/nfc_attendance/.env
-ExecStart=/home/being/.local/bin/uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+User=nakazawa29
+WorkingDirectory=/home/nakazawa29/programs/nfc_attendance
+EnvironmentFile=/home/nakazawa29/programs/nfc_attendance/.env
+ExecStart=/home/nakazawa29/.local/bin/uv run python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=5
 

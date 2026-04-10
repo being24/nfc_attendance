@@ -5,10 +5,10 @@ Wants=nfc-attendance-web.service
 
 [Service]
 Type=simple
-User=being
-WorkingDirectory=/home/being/programs/nfc_attendance
-EnvironmentFile=/home/being/programs/nfc_attendance/.env
-ExecStart=/home/being/.local/bin/uv run python -m reader.main
+User=nakazawa29
+WorkingDirectory=/home/nakazawa29/programs/nfc_attendance
+EnvironmentFile=/home/nakazawa29/programs/nfc_attendance/.env
+ExecStart=/home/nakazawa29/.local/bin/uv run python -m reader.main
 Restart=always
 RestartSec=5
 
