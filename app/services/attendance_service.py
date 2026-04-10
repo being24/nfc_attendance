@@ -272,20 +272,27 @@ class AttendanceService:
             for e, student in self.att_repo.list_today_events(now.date())
         ]
 
-        latest_unknown = self.unknown_repo.get_latest()
-        unknown_card_alert = None
-        if latest_unknown is not None:
-            detected_at = from_unix_seconds(latest_unknown.detected_at)
-            age_seconds = (ensure_jst(now) - detected_at).total_seconds()
-            if 0 <= age_seconds <= self.UNKNOWN_CARD_ALERT_WINDOW_SECONDS:
-                unknown_card_alert = UnknownCardAlertResponse(
-                    card_id=latest_unknown.card_id,
-                    reader_name=latest_unknown.reader_name,
-                    detected_at=detected_at,
-                )
+        unknown_card_alert = self.get_latest_unknown_card_alert(now=now)
 
         return TodayAttendanceResponse(
             in_room=in_room,
             events=events,
             unknown_card_alert=unknown_card_alert,
+        )
+
+    def get_latest_unknown_card_alert(self, now: datetime | None = None) -> UnknownCardAlertResponse | None:
+        current = ensure_jst(now or now_jst())
+        latest_unknown = self.unknown_repo.get_latest()
+        if latest_unknown is None:
+            return None
+
+        detected_at = from_unix_seconds(latest_unknown.detected_at)
+        age_seconds = (current - detected_at).total_seconds()
+        if not 0 <= age_seconds <= self.UNKNOWN_CARD_ALERT_WINDOW_SECONDS:
+            return None
+
+        return UnknownCardAlertResponse(
+            card_id=latest_unknown.card_id,
+            reader_name=latest_unknown.reader_name,
+            detected_at=detected_at,
         )

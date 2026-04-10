@@ -143,3 +143,17 @@ def test_get_today_attendance_includes_recent_unknown_card_alert(db_session):
     assert today.unknown_card_alert is not None
     assert today.unknown_card_alert.card_id == "NO_CARD"
     assert today.unknown_card_alert.reader_name == "reader-a"
+
+
+def test_get_latest_unknown_card_alert_returns_recent_entry(db_session):
+    svc = AttendanceService(db_session)
+    detected_at = now_jst()
+
+    with pytest.raises(UnknownCardError):
+        svc.prepare_touch("NO_CARD", "reader-a", detected_at)
+
+    latest = svc.get_latest_unknown_card_alert(now=detected_at)
+
+    assert latest is not None
+    assert latest.card_id == "NO_CARD"
+    assert latest.reader_name == "reader-a"

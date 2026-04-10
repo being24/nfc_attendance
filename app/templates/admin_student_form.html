@@ -5,6 +5,15 @@
   {% if error %}
   <p class="alert">{{ error }}</p>
   {% endif %}
+  <p
+    id="student-card-capture-status"
+    class="capture-status"
+    {% if form_mode != "create" %}style="display:none"{% endif %}
+  >
+    {% if form_mode == "create" %}
+    未登録カードをかざすとカードID欄に自動入力されます。
+    {% endif %}
+  </p>
   <form method="post" action="{{ '/admin/students' if form_mode == 'create' else '/admin/students/' ~ student.id }}">
     {% if form_mode == "create" %}
     <label>学籍番号 <input name="student_code" required></label>
@@ -13,7 +22,7 @@
     {% endif %}
 
     <label>氏名 <input name="name" value="{{ student.name if student else '' }}" required></label>
-    <label>カードID <input name="card_id" value="{{ student.card_id if student else '' }}" required></label>
+    <label>カードID <input id="student-card-id-input" name="card_id" value="{{ student.card_id if student else '' }}" required></label>
     <label>備考 <textarea name="note">{{ student.note if student and student.note else '' }}</textarea></label>
 
     {% if form_mode == "edit" %}

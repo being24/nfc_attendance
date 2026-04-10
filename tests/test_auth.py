@@ -47,6 +47,9 @@ def test_admin_api_requires_login(client):
     )
     assert res.status_code == 401
 
+    res_latest_unknown = client.get("/api/admin/latest-unknown-card")
+    assert res_latest_unknown.status_code == 401
+
 
 def test_touch_login_success(client):
     res = client.post(

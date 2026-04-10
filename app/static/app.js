@@ -9,6 +9,7 @@ let attendancePollTimerId = null;
 let attendanceRefreshInFlight = false;
 let attendanceEventSource = null;
 let attendanceSseFallbackActive = false;
+let studentCardCaptureEventSource = null;
 
 function escapeHtml(value) {
   return String(value)
@@ -228,5 +229,56 @@ function initTopDashboard() {
   });
 }
 
+async function refreshStudentCardCapture() {
+  const cardInput = document.getElementById("student-card-id-input");
+  const status = document.getElementById("student-card-capture-status");
+  if (!cardInput || !status || window.location.pathname !== "/admin/students/new") {
+    return;
+  }
+
+  try {
+    const response = await window.fetch("/api/admin/latest-unknown-card", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (response.status === 401) {
+      status.textContent = "管理者ログインが必要です。";
+      return;
+    }
+    if (!response.ok) {
+      throw new Error(`Failed to fetch latest unknown card: ${response.status}`);
+    }
+
+    const payload = await response.json();
+    if (!payload) {
+      return;
+    }
+
+    cardInput.value = payload.card_id || "";
+    const readerSuffix = payload.reader_name ? ` / reader: ${payload.reader_name}` : "";
+    status.textContent = `カードを受信しました: ${payload.card_id}${readerSuffix}`;
+  } catch (error) {
+    console.warn("Failed to refresh student card capture", error);
+  }
+}
+
+function initStudentCardCapture() {
+  if (window.location.pathname !== "/admin/students/new") {
+    return;
+  }
+
+  refreshStudentCardCapture();
+  if ("EventSource" in window) {
+    studentCardCaptureEventSource = new window.EventSource("/api/attendance/stream");
+    studentCardCaptureEventSource.onmessage = function () {
+      refreshStudentCardCapture();
+    };
+    studentCardCaptureEventSource.onerror = function () {
+      console.warn("Student card capture SSE connection failed");
+    };
+  }
+}
+
 initCardIdInputFocus();
 initTopDashboard();
+initStudentCardCapture();
