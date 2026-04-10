@@ -2,6 +2,10 @@ from fastapi import APIRouter, Depends, Header, HTTPException
 
 from app.config import get_settings
 from app.deps import get_attendance_service
+from app.kiosk import kiosk_state
+from app.realtime import attendance_event_broker
+from app.schemas.kiosk import KioskModeResponse
+from app.schemas.touch_panel import TouchPanelErrorCaptureRequest
 from app.schemas.reader import (
     ReaderTouchConfirmRequest,
     ReaderTouchConfirmResponse,
@@ -9,6 +13,7 @@ from app.schemas.reader import (
     ReaderTouchResponse,
 )
 from app.services.attendance_service import AttendanceService
+from app.touch_panel import touch_panel_state
 
 router = APIRouter(prefix="/api/reader", tags=["reader"])
 settings = get_settings()
@@ -25,6 +30,40 @@ def create_touch(
     service: AttendanceService = Depends(get_attendance_service),
 ):
     return service.prepare_touch(payload.card_id, payload.reader_name, payload.detected_at)
+
+
+@router.post("/captures/admin-login", dependencies=[Depends(require_reader_token)])
+def capture_admin_login_card(payload: ReaderTouchRequest):
+    kiosk_state.store_admin_login_capture(payload.card_id, payload.reader_name, payload.detected_at)
+    attendance_event_broker.publish()
+    return {"ok": True}
+
+
+@router.post("/captures/student-card", dependencies=[Depends(require_reader_token)])
+def capture_student_card(payload: ReaderTouchRequest):
+    kiosk_state.store_student_card_capture(payload.card_id, payload.reader_name, payload.detected_at)
+    attendance_event_broker.publish()
+    return {"ok": True}
+
+
+@router.post("/captures/term-total", dependencies=[Depends(require_reader_token)])
+def capture_term_total(
+    payload: ReaderTouchRequest,
+    service: AttendanceService = Depends(get_attendance_service),
+):
+    return service.capture_current_term_total_by_card(payload.card_id, payload.reader_name, payload.detected_at)
+
+
+@router.post("/captures/touch-error", dependencies=[Depends(require_reader_token)])
+def capture_touch_error(payload: TouchPanelErrorCaptureRequest):
+    touch_panel_state.store_error(message=payload.message, detected_at=payload.detected_at)
+    attendance_event_broker.publish()
+    return {"ok": True}
+
+
+@router.get("/kiosk-mode", response_model=KioskModeResponse, dependencies=[Depends(require_reader_token)])
+def get_kiosk_mode():
+    return KioskModeResponse(mode=kiosk_state.get_mode())
 
 
 @router.post(

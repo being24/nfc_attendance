@@ -51,6 +51,17 @@ def configure_logger() -> logging.Logger:
 
 logger = configure_logger()
 
+ACTION_LABELS = {
+    "ENTER": "入室",
+    "LEAVE_TEMP": "一時退出",
+    "RETURN": "再入室",
+    "LEAVE_FINAL": "退出",
+}
+
+
+class InvalidPreferredActionError(RuntimeError):
+    pass
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="ダミーNFCリーダークライアント")
@@ -85,7 +96,11 @@ def choose_action(requested: str, allowed_actions: list[str], preferred_action: 
             raise RuntimeError("サーバーから許可操作が返されませんでした")
         if preferred_action is not None:
             if preferred_action not in allowed_actions:
-                raise RuntimeError(f"選択中の操作 {preferred_action} は許可されていません（許可: {allowed_actions}）")
+                preferred_label = ACTION_LABELS.get(preferred_action, preferred_action)
+                allowed_labels = [ACTION_LABELS.get(action, action) for action in allowed_actions]
+                raise InvalidPreferredActionError(
+                    f"選択中の操作「{preferred_label}」はこのカードでは使えません（許可: {', '.join(allowed_labels)}）"
+                )
             return preferred_action
         return allowed_actions[0]
     if requested not in allowed_actions:
@@ -117,11 +132,35 @@ def run_once(client: ReaderApiClient, debouncer: Debouncer, card_id: str, reader
         return
 
     try:
+        kiosk_mode = client.get_kiosk_mode().get("mode", "ATTENDANCE")
+        if kiosk_mode == "ADMIN_LOGIN":
+            client.capture_admin_login_card(card_id=card_id, reader_name=reader_name, detected_at=now)
+            logger.info("card captured for admin login card_id=%s reader_name=%s", card_id, reader_name)
+            return
+        if kiosk_mode == "STUDENT_REGISTER":
+            client.capture_student_card(card_id=card_id, reader_name=reader_name, detected_at=now)
+            logger.info("card captured for student registration card_id=%s reader_name=%s", card_id, reader_name)
+            return
+        touch_panel_action = client.get_touch_panel_action().get("selected_action", "ENTER")
+        if touch_panel_action == "TERM_TOTAL":
+            result = client.capture_term_total(card_id=card_id, reader_name=reader_name, detected_at=now)
+            logger.info(
+                "term total captured card_id=%s reader_name=%s student_code=%s total_minutes=%s",
+                card_id,
+                reader_name,
+                result.get("student_code"),
+                result.get("total_minutes"),
+            )
+            return
         touch = client.prepare_touch(card_id=card_id, reader_name=reader_name, detected_at=now)
         allowed = touch.get("allowed_actions", [])
         preferred_action = touch.get("preferred_action")
         chosen = choose_action(action, allowed, preferred_action=preferred_action)
         confirm = client.confirm_touch(touch_token=touch["touch_token"], action=chosen, now=datetime.now().astimezone())
+    except InvalidPreferredActionError as exc:
+        client.capture_touch_error(str(exc), detected_at=now)
+        logger.warning("reader invalid selected action card_id=%s reader_name=%s error=%s", card_id, reader_name, exc)
+        return
     except httpx.HTTPStatusError as exc:
         logger.error(
             "reader api error card_id=%s reader_name=%s %s",

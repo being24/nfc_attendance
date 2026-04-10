@@ -21,6 +21,7 @@ class StudentService:
                 student_code=payload.student_code,
                 name=payload.name,
                 card_id=payload.card_id,
+                is_admin=payload.is_admin,
                 note=payload.note,
             )
         except IntegrityError as e:
@@ -47,6 +48,9 @@ class StudentService:
 
     def list_students(self, include_inactive: bool = False) -> list[Student]:
         return self.repo.list_all(include_inactive=include_inactive)
+
+    def get_by_card_id(self, card_id: str) -> Student | None:
+        return self.repo.get_by_card_id(card_id)
 
     def get_student(self, student_id: int) -> Student:
         student = self.repo.get_by_id(student_id)

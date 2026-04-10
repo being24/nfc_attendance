@@ -7,12 +7,14 @@ class StudentCreate(BaseModel):
     student_code: str = Field(min_length=1)
     name: str = Field(min_length=1)
     card_id: str = Field(min_length=1)
+    is_admin: bool = False
     note: str | None = None
 
 
 class StudentUpdate(BaseModel):
     name: str | None = None
     card_id: str | None = None
+    is_admin: bool | None = None
     note: str | None = None
     is_active: bool | None = None
 
@@ -22,6 +24,7 @@ class StudentResponse(BaseModel):
     student_code: str
     name: str
     card_id: str
+    is_admin: bool
     is_active: bool
     note: str | None
     created_at: datetime

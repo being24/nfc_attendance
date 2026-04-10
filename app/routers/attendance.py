@@ -4,11 +4,15 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 
 from app.deps import get_attendance_service
+from app.kiosk import kiosk_state
 from app.realtime import attendance_event_broker
 from app.schemas.attendance import TodayAttendanceResponse
 from app.schemas.touch_panel import TouchPanelActionResponse, TouchPanelActionUpdateRequest
+from app.schemas.kiosk import KioskModeResponse
 from app.services.attendance_service import AttendanceService
 from app.touch_panel import touch_panel_state
+from app.kiosk import KioskMode
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/api/attendance", tags=["attendance"])
 
@@ -28,6 +32,15 @@ def set_touch_panel_action(payload: TouchPanelActionUpdateRequest):
     action = touch_panel_state.set_selected_action(payload.action)
     attendance_event_broker.publish()
     return TouchPanelActionResponse(selected_action=action)
+
+
+class KioskModeUpdateRequest(BaseModel):
+    mode: KioskMode
+
+
+@router.post("/kiosk-mode", response_model=KioskModeResponse)
+def set_kiosk_mode(payload: KioskModeUpdateRequest):
+    return KioskModeResponse(mode=kiosk_state.set_mode(payload.mode))
 
 
 @router.get("/stream")

@@ -7,7 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings
-from app.db import Base, engine
+from app.db import Base, engine, ensure_schema_compatibility
 from app.exceptions import install_exception_handlers
 import app.models  # noqa: F401
 from app.routers import (
@@ -22,9 +22,14 @@ from app.routers import (
 
 app = FastAPI(title="NFC出欠管理 API")
 settings = get_settings()
-app.add_middleware(SessionMiddleware, secret_key=settings.session_secret_key)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.session_secret_key,
+    max_age=settings.session_max_age_seconds,
+)
 
 Base.metadata.create_all(bind=engine)
+ensure_schema_compatibility()
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 app.mount("/static", StaticFiles(directory=str(Path(__file__).resolve().parent / "static")), name="static")

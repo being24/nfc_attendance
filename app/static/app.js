@@ -4,8 +4,11 @@ document.body.addEventListener("htmx:responseError", function () {
 
 const ATTENDANCE_POLL_INTERVAL_MS = 15000;
 const STUDENT_CARD_CAPTURE_POLL_INTERVAL_MS = 1000;
-const UNKNOWN_CARD_ALERT_DURATION_MS = 10000;
+const UNKNOWN_CARD_ALERT_DURATION_MS = 5000;
 let unknownCardAlertTimerId = null;
+let lockAlertTimerId = null;
+let touchErrorAlertTimerId = null;
+let termTotalAlertTimerId = null;
 let attendancePollTimerId = null;
 let attendanceRefreshInFlight = false;
 let attendanceEventSource = null;
@@ -13,6 +16,25 @@ let attendanceSseFallbackActive = false;
 let studentCardCaptureEventSource = null;
 let studentCardCapturePollTimerId = null;
 let studentCardCaptureRefreshInFlight = false;
+let loginCardCapturePollTimerId = null;
+let loginCardCaptureRefreshInFlight = false;
+let lastLoginCaptureKey = null;
+let lastStudentCardCaptureKey = null;
+
+async function setKioskMode(mode) {
+  try {
+    await window.fetch("/api/attendance/kiosk-mode", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ mode }),
+    });
+  } catch (error) {
+    console.warn("Failed to set kiosk mode", error);
+  }
+}
 
 function touchActionLabel(action) {
   const labels = {
@@ -20,6 +42,7 @@ function touchActionLabel(action) {
     LEAVE_TEMP: "一時退出",
     RETURN: "再入室",
     LEAVE_FINAL: "退出",
+    TERM_TOTAL: "通算時間",
   };
   return labels[action] || action;
 }
@@ -164,16 +187,118 @@ function updateUnknownCardAlert(alert) {
   }, UNKNOWN_CARD_ALERT_DURATION_MS);
 }
 
+function updateLockAlert(alert) {
+  const card = document.getElementById("lock-alert");
+  if (!card) {
+    return;
+  }
+
+  if (lockAlertTimerId !== null) {
+    window.clearTimeout(lockAlertTimerId);
+    lockAlertTimerId = null;
+  }
+
+  if (!alert) {
+    card.classList.add("is-hidden");
+    return;
+  }
+
+  card.innerHTML = `
+    <h2>施錠してください</h2>
+    <p>${escapeHtml(alert.message)}</p>
+  `;
+  card.classList.remove("is-hidden");
+  lockAlertTimerId = window.setTimeout(() => {
+    card.classList.add("is-hidden");
+    lockAlertTimerId = null;
+  }, UNKNOWN_CARD_ALERT_DURATION_MS);
+}
+
+function updateTouchErrorAlert(alert) {
+  const card = document.getElementById("touch-error-alert");
+  if (!card) {
+    return;
+  }
+
+  if (touchErrorAlertTimerId !== null) {
+    window.clearTimeout(touchErrorAlertTimerId);
+    touchErrorAlertTimerId = null;
+  }
+
+  if (!alert) {
+    card.classList.add("is-hidden");
+    return;
+  }
+
+  card.innerHTML = `
+    <h2>操作できません</h2>
+    <p>${escapeHtml(alert.message)}</p>
+  `;
+  card.classList.remove("is-hidden");
+  touchErrorAlertTimerId = window.setTimeout(() => {
+    card.classList.add("is-hidden");
+    touchErrorAlertTimerId = null;
+  }, UNKNOWN_CARD_ALERT_DURATION_MS);
+}
+
+function updateTermTotalAlert(result) {
+  const card = document.getElementById("term-total-alert");
+  if (!card) {
+    return;
+  }
+
+  if (termTotalAlertTimerId !== null) {
+    window.clearTimeout(termTotalAlertTimerId);
+    termTotalAlertTimerId = null;
+  }
+
+  if (!result) {
+    card.classList.add("is-hidden");
+    return;
+  }
+
+  const hours = Math.floor((result.total_minutes || 0) / 60);
+  const minutes = (result.total_minutes || 0) % 60;
+  card.innerHTML = `
+    <h2>今期の通算在室時間</h2>
+    <p><strong>${escapeHtml(result.student_code)} ${escapeHtml(result.student_name)}</strong> / ${hours}時間${minutes}分（${escapeHtml(result.total_minutes)}分）</p>
+    <p>${escapeHtml(result.period_label)}</p>
+  `;
+  card.classList.remove("is-hidden");
+  termTotalAlertTimerId = window.setTimeout(() => {
+    card.classList.add("is-hidden");
+    termTotalAlertTimerId = null;
+  }, UNKNOWN_CARD_ALERT_DURATION_MS);
+}
+
 function updateTouchPanelAction(action) {
   const status = document.getElementById("touch-action-status");
+  const banner = document.getElementById("touch-action-banner");
+  const help = document.getElementById("touch-action-help");
+  const manualForm = document.getElementById("manual-card-form");
   const manualActionInput = document.getElementById("manual-action-input");
+  const manualSubmitButton = document.getElementById("manual-submit-button");
   const buttons = document.querySelectorAll("[data-touch-action]");
 
   if (status) {
-    status.textContent = `現在の打刻モード: ${touchActionLabel(action)}`;
+    status.textContent = touchActionLabel(action);
+  }
+  if (banner) {
+    banner.className = `touch-action-banner touch-action-${String(action).toLowerCase()}`;
+  }
+  if (help) {
+    help.textContent = action === "TERM_TOTAL"
+      ? "この状態でカードをかざすと、今期の通算在室時間を表示します。"
+      : "この状態でカードをかざすと、選択中の操作で処理します。";
+  }
+  if (manualForm) {
+    manualForm.action = action === "TERM_TOTAL" ? "/student/term-total" : "/touch/manual";
   }
   if (manualActionInput) {
     manualActionInput.value = action;
+  }
+  if (manualSubmitButton) {
+    manualSubmitButton.textContent = action === "TERM_TOTAL" ? "このカードIDで通算時間を表示" : "このカードIDで打刻";
   }
   buttons.forEach((button) => {
     if (!(button instanceof HTMLElement)) {
@@ -260,6 +385,9 @@ async function refreshTodayAttendance() {
     updateInRoom(payload.in_room || []);
     updateRecentEvents(payload.events || []);
     updateUnknownCardAlert(payload.unknown_card_alert || null);
+    updateLockAlert(payload.lock_alert || null);
+    updateTouchErrorAlert(payload.touch_error || null);
+    updateTermTotalAlert(payload.latest_term_total || null);
   } catch (error) {
     console.warn("Failed to refresh attendance", error);
   } finally {
@@ -282,6 +410,7 @@ function initTopDashboard() {
     return;
   }
 
+  setKioskMode("ATTENDANCE");
   refreshTodayAttendance();
   if ("EventSource" in window) {
     attendanceEventSource = new window.EventSource("/api/attendance/stream");
@@ -322,7 +451,7 @@ async function refreshStudentCardCapture() {
 
   studentCardCaptureRefreshInFlight = true;
   try {
-    const response = await window.fetch("/api/admin/latest-unknown-card", {
+    const response = await window.fetch("/api/admin/latest-student-card", {
       headers: { Accept: "application/json" },
       cache: "no-store",
     });
@@ -338,6 +467,11 @@ async function refreshStudentCardCapture() {
     if (!payload) {
       return;
     }
+    const captureKey = `${payload.card_id}:${payload.detected_at}`;
+    if (captureKey === lastStudentCardCaptureKey) {
+      return;
+    }
+    lastStudentCardCaptureKey = captureKey;
 
     cardInput.value = payload.card_id || "";
     const readerSuffix = payload.reader_name ? ` / reader: ${payload.reader_name}` : "";
@@ -366,6 +500,7 @@ function initStudentCardCapture() {
     return;
   }
 
+  setKioskMode("STUDENT_REGISTER");
   refreshStudentCardCapture();
   scheduleStudentCardCaptureRefresh();
   if ("EventSource" in window) {
@@ -386,7 +521,79 @@ function initStudentCardCapture() {
   });
 }
 
+async function refreshLoginCardCapture() {
+  const cardInput = document.getElementById("login-card-id-input");
+  const status = document.getElementById("login-card-capture-status");
+  const form = document.getElementById("login-touch-form");
+  if (!cardInput || !status || !form) {
+    return;
+  }
+  if (loginCardCaptureRefreshInFlight) {
+    return;
+  }
+
+  loginCardCaptureRefreshInFlight = true;
+  try {
+    const response = await window.fetch("/api/login/latest-card", {
+      headers: { Accept: "application/json" },
+      cache: "no-store",
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch latest login card: ${response.status}`);
+    }
+    const payload = await response.json();
+    if (!payload) {
+      return;
+    }
+    const captureKey = `${payload.card_id}:${payload.detected_at}`;
+    if (captureKey === lastLoginCaptureKey) {
+      return;
+    }
+    lastLoginCaptureKey = captureKey;
+
+    cardInput.value = payload.card_id || "";
+    const readerSuffix = payload.reader_name ? ` / reader: ${payload.reader_name}` : "";
+    status.textContent = `カードを受信しました: ${payload.card_id}${readerSuffix}`;
+    form.submit();
+  } catch (error) {
+    console.warn("Failed to refresh login card capture", error);
+  } finally {
+    loginCardCaptureRefreshInFlight = false;
+  }
+}
+
+function scheduleLoginCardCaptureRefresh(delayMs = 1000) {
+  if (loginCardCapturePollTimerId !== null) {
+    window.clearTimeout(loginCardCapturePollTimerId);
+  }
+  loginCardCapturePollTimerId = window.setTimeout(async () => {
+    await refreshLoginCardCapture();
+    scheduleLoginCardCaptureRefresh();
+  }, delayMs);
+}
+
+function initLoginCardCapture() {
+  const form = document.getElementById("login-touch-form");
+  if (!form) {
+    return;
+  }
+
+  setKioskMode("ADMIN_LOGIN");
+  refreshLoginCardCapture();
+  scheduleLoginCardCaptureRefresh();
+  if ("EventSource" in window) {
+    const source = new window.EventSource("/api/attendance/stream");
+    source.onmessage = function () {
+      refreshLoginCardCapture();
+    };
+    source.onerror = function () {
+      console.warn("Login card capture SSE connection failed");
+    };
+  }
+}
+
 initCardIdInputFocus();
 initTopDashboard();
 initStudentCardCapture();
 initTouchPanelSelector();
+initLoginCardCapture();

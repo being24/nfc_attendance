@@ -23,10 +23,11 @@
 
     <label>氏名 <input name="name" value="{{ student.name if student else '' }}" required></label>
     <label>カードID <input id="student-card-id-input" name="card_id" value="{{ student.card_id if student else '' }}" required></label>
+    <label class="checkbox-field"><span>管理者カードとして使う</span><input type="checkbox" name="is_admin" value="true" {% if student and student.is_admin %}checked{% endif %}></label>
     <label>備考 <textarea name="note">{{ student.note if student and student.note else '' }}</textarea></label>
 
     {% if form_mode == "edit" %}
-    <label><input type="checkbox" name="is_active" value="true" {% if student.is_active %}checked{% endif %}> 有効</label>
+    <label class="checkbox-field"><span>有効</span><input type="checkbox" name="is_active" value="true" {% if student.is_active %}checked{% endif %}></label>
     {% endif %}
 
     <div class="actions">

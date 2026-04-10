@@ -2,9 +2,11 @@ from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from app.admin_session import require_admin_page_auth
 from app.domain.enums import AttendanceAction
 from app.domain.time_utils import now_jst
 from app.deps import get_attendance_service, get_student_service
+from app.kiosk import kiosk_state, KioskMode
 from app.schemas.student import StudentCreate, StudentUpdate
 from app.services.attendance_service import AttendanceService
 from app.services.exceptions import (
@@ -14,7 +16,7 @@ from app.services.exceptions import (
     StudentNotFoundError,
 )
 from app.services.student_service import StudentService
-from app.touch_panel import touch_panel_state
+from app.touch_panel import TouchPanelSelection, touch_panel_state
 
 router = APIRouter(tags=["pages"])
 templates = Jinja2Templates(directory="app/templates")
@@ -24,6 +26,7 @@ ACTION_LABELS = {
     AttendanceAction.LEAVE_TEMP.value: "一時退出",
     AttendanceAction.RETURN.value: "再入室",
     AttendanceAction.LEAVE_FINAL.value: "退出",
+    TouchPanelSelection.TERM_TOTAL.value: "通算時間",
 }
 
 STATUS_LABELS = {
@@ -38,17 +41,12 @@ SOURCE_LABELS = {
 }
 
 
-def require_admin_page_auth(request: Request):
-    if not request.session.get("admin_authenticated"):
-        return RedirectResponse(url=f"/login?next={request.url.path}", status_code=303)
-    return None
-
-
 @router.get("/", response_class=HTMLResponse)
 def index_page(
     request: Request,
     attendance_service: AttendanceService = Depends(get_attendance_service),
 ):
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
     today = attendance_service.get_today_attendance()
     return templates.TemplateResponse(
         request,
@@ -59,6 +57,9 @@ def index_page(
             "in_room": today.in_room,
             "recent_events": today.events[:5],
             "unknown_card_alert": today.unknown_card_alert,
+            "lock_alert": today.lock_alert,
+            "touch_error": today.touch_error,
+            "latest_term_total": today.latest_term_total,
             "selected_touch_action": touch_panel_state.get_selected_action().value,
             "event_type_labels": ACTION_LABELS,
         },
@@ -158,6 +159,10 @@ def admin_today_page(
     request: Request,
     attendance_service: AttendanceService = Depends(get_attendance_service),
 ):
+    redirect = require_admin_page_auth(request)
+    if redirect:
+        return redirect
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
     today = attendance_service.get_today_attendance()
     return templates.TemplateResponse(
         request,
@@ -178,6 +183,7 @@ def admin_students_page(
     redirect = require_admin_page_auth(request)
     if redirect:
         return redirect
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
     students = student_service.list_students(include_inactive=True)
     return templates.TemplateResponse(
         request,
@@ -194,6 +200,7 @@ def admin_student_new_form(request: Request):
     redirect = require_admin_page_auth(request)
     if redirect:
         return redirect
+    kiosk_state.set_mode(KioskMode.STUDENT_REGISTER)
     return templates.TemplateResponse(
         request,
         "admin_student_form.html",
@@ -215,6 +222,7 @@ def admin_student_edit_form(
     redirect = require_admin_page_auth(request)
     if redirect:
         return redirect
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
     try:
         student = student_service.get_student(student_id)
     except StudentNotFoundError as e:
@@ -237,6 +245,7 @@ def admin_student_create(
     student_code: str = Form(...),
     name: str = Form(...),
     card_id: str = Form(...),
+    is_admin: bool = Form(False),
     note: str = Form(""),
     student_service: StudentService = Depends(get_student_service),
 ):
@@ -249,6 +258,7 @@ def admin_student_create(
                 student_code=student_code,
                 name=name,
                 card_id=card_id,
+                is_admin=is_admin,
                 note=note or None,
             )
         )
@@ -274,6 +284,7 @@ def admin_student_update(
     student_id: int,
     name: str = Form(...),
     card_id: str = Form(...),
+    is_admin: bool = Form(False),
     note: str = Form(""),
     is_active: bool = Form(False),
     student_service: StudentService = Depends(get_student_service),
@@ -284,7 +295,7 @@ def admin_student_update(
     try:
         student_service.update_student(
             student_id,
-            StudentUpdate(name=name, card_id=card_id, note=note or None, is_active=is_active),
+            StudentUpdate(name=name, card_id=card_id, is_admin=is_admin, note=note or None, is_active=is_active),
         )
     except StudentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
@@ -313,6 +324,7 @@ def admin_events_page(
     redirect = require_admin_page_auth(request)
     if redirect:
         return redirect
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
     today = attendance_service.get_today_attendance()
     return templates.TemplateResponse(
         request,
@@ -331,6 +343,7 @@ def admin_export_page(request: Request):
     redirect = require_admin_page_auth(request)
     if redirect:
         return redirect
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
     now = now_jst()
     semester_year = now.year if now.month >= 4 else now.year - 1
     semester = 1 if 4 <= now.month <= 9 else 2

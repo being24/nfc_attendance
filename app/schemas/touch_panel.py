@@ -1,11 +1,18 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
-from app.domain.enums import AttendanceAction
+from app.touch_panel import TouchPanelSelection
 
 
 class TouchPanelActionResponse(BaseModel):
-    selected_action: AttendanceAction
+    selected_action: TouchPanelSelection
 
 
 class TouchPanelActionUpdateRequest(BaseModel):
-    action: AttendanceAction
+    action: TouchPanelSelection
+
+
+class TouchPanelErrorCaptureRequest(BaseModel):
+    message: str
+    detected_at: datetime

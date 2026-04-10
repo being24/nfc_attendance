@@ -49,9 +49,11 @@ uv run python -m pytest -q
 - `READER_NAME`（default: 未設定時は自動切替。実機=`real-reader`、ダミー=`dummy-reader`）
 - `READER_DEVICE_KEYWORD`（default: `SONY FeliCa`、実機reader用）
 - `SESSION_SECRET_KEY`（default: `dev-session-secret`）
+- `SESSION_MAX_AGE_SECONDS`（default: `300`）
 - `ADMIN_USERNAME`（default: `admin`）
 - `ADMIN_PASSWORD`（default: `admin`）
-- `ADMIN_CARD_IDS`（default: `ADMIN-CARD-001`、カンマ区切り）
+
+管理者カードログインは `students.is_admin` を参照します。学生登録・編集画面で「管理者カードとして使う」を有効にしたカードだけが `/login/touch` でログインできます。
 
 ## Readerプロセス起動（実機 / ダミー）
 

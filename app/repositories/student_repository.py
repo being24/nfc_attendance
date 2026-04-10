@@ -24,8 +24,15 @@ class StudentRepository:
             stmt = stmt.where(Student.is_active.is_(True))
         return list(self.db.scalars(stmt.order_by(Student.id)).all())
 
-    def create(self, student_code: str, name: str, card_id: str, note: str | None = None) -> Student:
-        student = Student(student_code=student_code, name=name, card_id=card_id, note=note)
+    def create(
+        self,
+        student_code: str,
+        name: str,
+        card_id: str,
+        is_admin: bool = False,
+        note: str | None = None,
+    ) -> Student:
+        student = Student(student_code=student_code, name=name, card_id=card_id, is_admin=is_admin, note=note)
         self.db.add(student)
         try:
             self.db.commit()

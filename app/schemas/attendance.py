@@ -28,7 +28,28 @@ class UnknownCardAlertResponse(BaseModel):
     detected_at: datetime
 
 
+class LockAlertResponse(BaseModel):
+    message: str
+    detected_at: datetime
+
+
+class TouchPanelErrorResponse(BaseModel):
+    message: str
+    detected_at: datetime
+
+
+class TermTotalLookupResponse(BaseModel):
+    student_code: str
+    student_name: str
+    total_minutes: int
+    period_label: str
+    detected_at: datetime
+
+
 class TodayAttendanceResponse(BaseModel):
     in_room: list[InRoomEntry]
     events: list[AttendanceEventResponse]
     unknown_card_alert: UnknownCardAlertResponse | None = None
+    lock_alert: LockAlertResponse | None = None
+    touch_error: TouchPanelErrorResponse | None = None
+    latest_term_total: TermTotalLookupResponse | None = None

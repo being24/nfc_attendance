@@ -71,10 +71,10 @@ def test_choose_action_prefers_touch_panel_selection():
 def test_choose_action_rejects_invalid_touch_panel_selection():
     try:
         reader_main.choose_action("auto", ["ENTER"], preferred_action="LEAVE_TEMP")
-    except RuntimeError as exc:
-        assert "選択中の操作 LEAVE_TEMP は許可されていません" in str(exc)
+    except reader_main.InvalidPreferredActionError as exc:
+        assert "使えません" in str(exc)
     else:
-        raise AssertionError("RuntimeError was not raised")
+        raise AssertionError("InvalidPreferredActionError was not raised")
 
 
 def test_build_card_event_handler_processes_insert(monkeypatch):
@@ -137,3 +137,113 @@ def test_build_card_event_handler_swallows_http_errors(monkeypatch):
     handler = reader_main.build_card_event_handler(object(), object(), "reader-a", "auto")
 
     handler("insert", "CARD1")
+
+
+def test_run_once_captures_admin_login_card(monkeypatch):
+    silence_reader_logger(monkeypatch)
+
+    class DummyClient:
+        def __init__(self):
+            self.calls = []
+
+        def get_kiosk_mode(self):
+            return {"mode": "ADMIN_LOGIN"}
+
+        def get_touch_panel_action(self):
+            return {"selected_action": "ENTER"}
+
+        def capture_admin_login_card(self, card_id, reader_name, detected_at):
+            self.calls.append(("admin", card_id, reader_name))
+            return {"ok": True}
+
+    client = DummyClient()
+    debouncer = reader_main.Debouncer(cooldown_seconds=0)
+
+    reader_main.run_once(client, debouncer, "CARD1", "reader-a", "auto")
+
+    assert client.calls == [("admin", "CARD1", "reader-a")]
+
+
+def test_run_once_captures_student_registration_card(monkeypatch):
+    silence_reader_logger(monkeypatch)
+
+    class DummyClient:
+        def __init__(self):
+            self.calls = []
+
+        def get_kiosk_mode(self):
+            return {"mode": "STUDENT_REGISTER"}
+
+        def get_touch_panel_action(self):
+            return {"selected_action": "ENTER"}
+
+        def capture_student_card(self, card_id, reader_name, detected_at):
+            self.calls.append(("student", card_id, reader_name))
+            return {"ok": True}
+
+    client = DummyClient()
+    debouncer = reader_main.Debouncer(cooldown_seconds=0)
+
+    reader_main.run_once(client, debouncer, "CARD2", "reader-a", "auto")
+
+    assert client.calls == [("student", "CARD2", "reader-a")]
+
+
+def test_run_once_captures_term_total(monkeypatch):
+    silence_reader_logger(monkeypatch)
+
+    class DummyClient:
+        def __init__(self):
+            self.calls = []
+
+        def get_kiosk_mode(self):
+            return {"mode": "ATTENDANCE"}
+
+        def get_touch_panel_action(self):
+            return {"selected_action": "TERM_TOTAL"}
+
+        def capture_term_total(self, card_id, reader_name, detected_at):
+            self.calls.append(("term_total", card_id, reader_name))
+            return {"student_code": "S001", "total_minutes": 90}
+
+    client = DummyClient()
+    debouncer = reader_main.Debouncer(cooldown_seconds=0)
+
+    reader_main.run_once(client, debouncer, "CARD3", "reader-a", "auto")
+
+    assert client.calls == [("term_total", "CARD3", "reader-a")]
+
+
+def test_run_once_captures_touch_error_for_invalid_selected_action(monkeypatch):
+    silence_reader_logger(monkeypatch)
+
+    class DummyClient:
+        def __init__(self):
+            self.calls = []
+
+        def get_kiosk_mode(self):
+            return {"mode": "ATTENDANCE"}
+
+        def get_touch_panel_action(self):
+            return {"selected_action": "ENTER"}
+
+        def prepare_touch(self, card_id, reader_name, detected_at):
+            self.calls.append(("prepare", card_id, reader_name))
+            return {
+                "touch_token": "tok123",
+                "allowed_actions": ["LEAVE_TEMP", "LEAVE_FINAL"],
+                "preferred_action": "ENTER",
+            }
+
+        def capture_touch_error(self, message, detected_at):
+            self.calls.append(("error", message))
+            return {"ok": True}
+
+    client = DummyClient()
+    debouncer = reader_main.Debouncer(cooldown_seconds=0)
+
+    reader_main.run_once(client, debouncer, "CARD4", "reader-a", "auto")
+
+    assert client.calls[0] == ("prepare", "CARD4", "reader-a")
+    assert client.calls[1][0] == "error"
+    assert "使えません" in client.calls[1][1]

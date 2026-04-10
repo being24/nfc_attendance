@@ -32,3 +32,7 @@ class AuditRepository:
 
     def list(self) -> list[AuditLog]:
         return list(self.db.scalars(select(AuditLog).order_by(AuditLog.id)).all())
+
+    def get_latest_by_action(self, action: str) -> AuditLog | None:
+        statement = select(AuditLog).where(AuditLog.action == action).order_by(AuditLog.id.desc()).limit(1)
+        return self.db.scalar(statement)

@@ -43,22 +43,100 @@
       {% endif %}
     </section>
 
+    <section
+      id="lock-alert"
+      class="card lock-alert{% if not lock_alert %} is-hidden{% endif %}"
+      aria-live="assertive"
+    >
+      {% if lock_alert %}
+      <h2>施錠してください</h2>
+      <p>{{ lock_alert.message }}</p>
+      {% else %}
+      <h2>施錠してください</h2>
+      <p></p>
+      {% endif %}
+    </section>
+
+    <section
+      id="touch-error-alert"
+      class="card touch-error-alert{% if not touch_error %} is-hidden{% endif %}"
+      aria-live="assertive"
+    >
+      {% if touch_error %}
+      <h2>操作できません</h2>
+      <p>{{ touch_error.message }}</p>
+      {% else %}
+      <h2>操作できません</h2>
+      <p></p>
+      {% endif %}
+    </section>
+
+    <section
+      id="term-total-alert"
+      class="card term-total-alert{% if not latest_term_total %} is-hidden{% endif %}"
+      aria-live="polite"
+    >
+      {% if latest_term_total %}
+      <h2>今期の通算在室時間</h2>
+      <p>
+        <strong>{{ latest_term_total.student_code }} {{ latest_term_total.student_name }}</strong>
+        / {{ (latest_term_total.total_minutes // 60) }}時間{{ (latest_term_total.total_minutes % 60) }}分
+        （{{ latest_term_total.total_minutes }}分）
+      </p>
+      <p>{{ latest_term_total.period_label }}</p>
+      {% else %}
+      <h2>今期の通算在室時間</h2>
+      <p></p>
+      <p></p>
+      {% endif %}
+    </section>
+
     <section class="card touch-panel">
       <h2>打刻操作</h2>
-      <p id="touch-action-status" class="capture-status">現在の打刻モード: {{ event_type_labels.get(selected_touch_action, selected_touch_action) }}</p>
-      <div class="touch-grid">
-        <button class="btn touch-btn{% if selected_touch_action == 'ENTER' %} is-selected{% endif %}" type="button" data-touch-action="ENTER">入室</button>
-        <button class="btn touch-btn{% if selected_touch_action == 'LEAVE_TEMP' %} is-selected{% endif %}" type="button" data-touch-action="LEAVE_TEMP">一時退出</button>
-        <button class="btn touch-btn{% if selected_touch_action == 'RETURN' %} is-selected{% endif %}" type="button" data-touch-action="RETURN">再入室</button>
-        <button class="btn touch-btn{% if selected_touch_action == 'LEAVE_FINAL' %} is-selected{% endif %}" type="button" data-touch-action="LEAVE_FINAL">退出</button>
+      <div id="touch-action-banner" class="touch-action-banner touch-action-{{ selected_touch_action|lower }}">
+        <p class="touch-action-banner-label">現在の打刻モード</p>
+        <p id="touch-action-status" class="touch-action-banner-value">{{ event_type_labels.get(selected_touch_action, selected_touch_action) }}</p>
+        <p id="touch-action-help" class="touch-action-banner-help">
+          {% if selected_touch_action == 'TERM_TOTAL' %}
+          この状態でカードをかざすと、今期の通算在室時間を表示します。
+          {% else %}
+          この状態でカードをかざすと、選択中の操作で処理します。
+          {% endif %}
+        </p>
       </div>
-      <form method="post" action="/touch/manual">
-        <hr class="touch-divider">
+      <div class="touch-grid">
+        <button class="btn touch-btn{% if selected_touch_action == 'ENTER' %} is-selected{% endif %}" type="button" data-touch-action="ENTER">
+          <span class="touch-btn-title">入室</span>
+          <span class="touch-btn-note">このモードでタッチ</span>
+        </button>
+        <button class="btn touch-btn{% if selected_touch_action == 'LEAVE_TEMP' %} is-selected{% endif %}" type="button" data-touch-action="LEAVE_TEMP">
+          <span class="touch-btn-title">一時退出</span>
+          <span class="touch-btn-note">このモードでタッチ</span>
+        </button>
+        <button class="btn touch-btn{% if selected_touch_action == 'RETURN' %} is-selected{% endif %}" type="button" data-touch-action="RETURN">
+          <span class="touch-btn-title">再入室</span>
+          <span class="touch-btn-note">このモードでタッチ</span>
+        </button>
+        <button class="btn touch-btn{% if selected_touch_action == 'LEAVE_FINAL' %} is-selected{% endif %}" type="button" data-touch-action="LEAVE_FINAL">
+          <span class="touch-btn-title">退出</span>
+          <span class="touch-btn-note">このモードでタッチ</span>
+        </button>
+        <button class="btn touch-btn{% if selected_touch_action == 'TERM_TOTAL' %} is-selected{% endif %}" type="button" data-touch-action="TERM_TOTAL">
+          <span class="touch-btn-title">通算時間</span>
+          <span class="touch-btn-note">カードをかざして表示</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="card manual-card-panel">
+      <h2>カードID手動入力</h2>
+      <form id="manual-card-form" method="post" action="{% if selected_touch_action == 'TERM_TOTAL' %}/student/term-total{% else %}/touch/manual{% endif %}">
         <input id="manual-action-input" type="hidden" name="action" value="{{ selected_touch_action }}">
-        <label>ダミーID入力欄（必要時のみ）<input id="card-id-input" name="card_id" placeholder="例: DUMMY-CARD-001" autocomplete="off" required></label>
+        <label>カードID <input id="card-id-input" name="card_id" placeholder="例: 012E5CF511C14E24" autocomplete="off" required></label>
         <div class="actions">
-          <button class="btn" type="submit">ダミー送信</button>
-          <button class="btn btn-secondary" type="submit" formaction="/student/term-total">今期の通算在室時間を表示</button>
+          <button id="manual-submit-button" class="btn" type="submit">
+            {% if selected_touch_action == 'TERM_TOTAL' %}このカードIDで通算時間を表示{% else %}このカードIDで打刻{% endif %}
+          </button>
         </div>
       </form>
     </section>

@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+import json
 from uuid import uuid4
 
 from sqlalchemy.orm import Session
@@ -8,14 +9,15 @@ from app.domain.pending_touch import PendingTouch
 from app.domain.state_machine import InvalidTransitionError, get_allowed_actions, next_state
 from app.domain.time_utils import ensure_jst, from_unix_seconds, minutes_between, now_jst
 from app.repositories.attendance_repository import AttendanceRepository
+from app.repositories.audit_repository import AuditRepository
 from app.repositories.student_repository import StudentRepository
 from app.repositories.unknown_card_repository import UnknownCardRepository
 from app.realtime import attendance_event_broker
 from app.touch_panel import touch_panel_state
 from app.models.attendance_session import AttendanceSession
 from app.models.student import Student
-from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, TodayAttendanceResponse
-from app.schemas.attendance import UnknownCardAlertResponse
+from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, TermTotalLookupResponse, TodayAttendanceResponse
+from app.schemas.attendance import LockAlertResponse, TouchPanelErrorResponse, UnknownCardAlertResponse
 from app.schemas.reader import ReaderTouchConfirmResponse, ReaderTouchResponse
 from app.services.audit_service import AuditService
 from app.services.exceptions import (
@@ -30,12 +32,14 @@ from app.services.exceptions import (
 class AttendanceService:
     PENDING_TTL_SECONDS = 20
     UNKNOWN_CARD_ALERT_WINDOW_SECONDS = 30
+    LOCK_ALERT_WINDOW_SECONDS = 30
     _shared_pending_touches: dict[str, PendingTouch] = {}
 
     def __init__(self, db: Session):
         self.db = db
         self.student_repo = StudentRepository(db)
         self.att_repo = AttendanceRepository(db)
+        self.audit_repo = AuditRepository(db)
         self.unknown_repo = UnknownCardRepository(db)
         self.audit_service = AuditService(db)
         self._pending_touches = self._shared_pending_touches
@@ -77,7 +81,7 @@ class AttendanceService:
             student_name=student.name,
             current_status=current_status,
             allowed_actions=allowed_actions,
-            preferred_action=touch_panel_state.get_selected_action(),
+            preferred_action=touch_panel_state.get_selected_attendance_action(),
             expires_at=pending.expires_at,
         )
 
@@ -217,6 +221,35 @@ class AttendanceService:
         total = sum(self._compute_net_minutes_for_period(s, start, end, current) for s in sessions)
         return student, total, start, min(end, current)
 
+    def capture_current_term_total_by_card(
+        self,
+        card_id: str,
+        reader_name: str | None,
+        detected_at: datetime,
+    ) -> TermTotalLookupResponse:
+        try:
+            student, total_minutes, start, end = self.get_current_term_total_minutes_by_card(card_id=card_id, now=detected_at)
+        except UnknownCardError:
+            self.unknown_repo.create(card_id=card_id, reader_name=reader_name, detected_at=detected_at)
+            attendance_event_broker.publish()
+            raise
+        period = f"{start.strftime('%Y-%m-%d')} 〜 {end.strftime('%Y-%m-%d')}"
+        display = touch_panel_state.store_term_total_display(
+            student_code=student.student_code,
+            student_name=student.name,
+            total_minutes=total_minutes,
+            period_label=period,
+            detected_at=detected_at,
+        )
+        attendance_event_broker.publish()
+        return TermTotalLookupResponse(
+            student_code=display.student_code,
+            student_name=display.student_name,
+            total_minutes=display.total_minutes,
+            period_label=display.period_label,
+            detected_at=display.detected_at,
+        )
+
     def compute_9_to_17_minutes(self, entered_at: datetime, left_at: datetime, session_id: int) -> int:
         entered = ensure_jst(entered_at)
         left = ensure_jst(left_at)
@@ -275,11 +308,34 @@ class AttendanceService:
         ]
 
         unknown_card_alert = self.get_latest_unknown_card_alert(now=now)
+        lock_alert = self.get_latest_lock_alert(now=now)
+        touch_error = touch_panel_state.get_latest_error(now)
+        latest_term_total = touch_panel_state.get_latest_term_total_display(now)
 
         return TodayAttendanceResponse(
             in_room=in_room,
             events=events,
             unknown_card_alert=unknown_card_alert,
+            lock_alert=lock_alert,
+            touch_error=(
+                TouchPanelErrorResponse(
+                    message=touch_error.message,
+                    detected_at=touch_error.detected_at,
+                )
+                if touch_error
+                else None
+            ),
+            latest_term_total=(
+                TermTotalLookupResponse(
+                    student_code=latest_term_total.student_code,
+                    student_name=latest_term_total.student_name,
+                    total_minutes=latest_term_total.total_minutes,
+                    period_label=latest_term_total.period_label,
+                    detected_at=latest_term_total.detected_at,
+                )
+                if latest_term_total
+                else None
+            ),
         )
 
     def get_latest_unknown_card_alert(self, now: datetime | None = None) -> UnknownCardAlertResponse | None:
@@ -298,3 +354,25 @@ class AttendanceService:
             reader_name=latest_unknown.reader_name,
             detected_at=detected_at,
         )
+
+    def get_latest_lock_alert(self, now: datetime | None = None) -> LockAlertResponse | None:
+        current = ensure_jst(now or now_jst())
+        latest_audit = self.audit_repo.get_latest_by_action("LOCK_ALERT")
+        if latest_audit is None:
+            return None
+
+        detected_at = from_unix_seconds(latest_audit.created_at)
+        age_seconds = (current - detected_at).total_seconds()
+        if not 0 <= age_seconds <= self.LOCK_ALERT_WINDOW_SECONDS:
+            return None
+
+        message = "在室者が0人になりました。施錠してください。"
+        if latest_audit.detail_json:
+            try:
+                payload = json.loads(latest_audit.detail_json)
+            except json.JSONDecodeError:
+                payload = None
+            if isinstance(payload, dict) and isinstance(payload.get("message"), str):
+                message = payload["message"]
+
+        return LockAlertResponse(message=message, detected_at=detected_at)

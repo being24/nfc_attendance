@@ -12,6 +12,7 @@
         <th>学籍番号</th>
         <th>氏名</th>
         <th>カードID</th>
+        <th>管理者</th>
         <th>有効</th>
         <th>操作</th>
       </tr>
@@ -23,11 +24,12 @@
         <td>{{ s.student_code }}</td>
         <td>{{ s.name }}</td>
         <td>{{ s.card_id }}</td>
+        <td>{{ "管理者" if s.is_admin else "-" }}</td>
         <td>{{ "有効" if s.is_active else "無効" }}</td>
         <td><a href="/admin/students/{{ s.id }}/edit">編集</a></td>
       </tr>
       {% else %}
-      <tr><td colspan="6">データがありません</td></tr>
+      <tr><td colspan="7">データがありません</td></tr>
       {% endfor %}
     </tbody>
   </table>

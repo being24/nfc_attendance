@@ -12,6 +12,7 @@ from app.services.exceptions import (
     UnknownCardError,
 )
 from app.services.student_service import StudentService
+from app.touch_panel import touch_panel_state
 
 
 def test_prepare_touch_unknown_card(db_session):
@@ -145,6 +146,34 @@ def test_get_today_attendance_includes_recent_unknown_card_alert(db_session):
     assert today.unknown_card_alert.reader_name == "reader-a"
 
 
+def test_get_today_attendance_includes_recent_lock_alert(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S010", name="Lock User", card_id="LOCK1"))
+    svc = AttendanceService(db_session)
+    entered_at = now_jst() - timedelta(minutes=10)
+
+    pending = svc.prepare_touch("LOCK1", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+
+    leaving_at = now_jst()
+    pending = svc.prepare_touch("LOCK1", "reader", leaving_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, leaving_at)
+
+    today = svc.get_today_attendance()
+
+    assert today.lock_alert is not None
+    assert "施錠してください" in today.lock_alert.message
+
+
+def test_get_today_attendance_includes_touch_panel_error(db_session):
+    touch_panel_state.store_error("選択中の操作はこのカードでは使えません", now_jst())
+    svc = AttendanceService(db_session)
+
+    today = svc.get_today_attendance()
+
+    assert today.touch_error is not None
+    assert "使えません" in today.touch_error.message
+
+
 def test_get_latest_unknown_card_alert_returns_recent_entry(db_session):
     svc = AttendanceService(db_session)
     detected_at = now_jst()
@@ -157,3 +186,25 @@ def test_get_latest_unknown_card_alert_returns_recent_entry(db_session):
     assert latest is not None
     assert latest.card_id == "NO_CARD"
     assert latest.reader_name == "reader-a"
+
+
+def test_capture_term_total_updates_today_attendance(db_session):
+    StudentService(db_session).register_student(StudentCreate(student_code="S002", name="Bob", card_id="CARD2"))
+    svc = AttendanceService(db_session)
+    entered_at = now_jst() - timedelta(minutes=90)
+
+    pending = svc.prepare_touch("CARD2", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+
+    left_at = now_jst()
+    pending = svc.prepare_touch("CARD2", "reader", left_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, left_at)
+
+    result = svc.capture_current_term_total_by_card("CARD2", "reader", left_at)
+    today = svc.get_today_attendance()
+
+    assert result.student_code == "S002"
+    assert result.total_minutes == 90
+    assert today.latest_term_total is not None
+    assert today.latest_term_total.student_name == "Bob"
+    assert today.latest_term_total.total_minutes == 90

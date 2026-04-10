@@ -6,9 +6,10 @@
   <p class="alert">{{ error }}</p>
   {% endif %}
   <h2>カードタッチログイン</h2>
-  <form method="post" action="/login/touch">
+  <p id="login-card-capture-status" class="capture-status">管理者カードをタッチしてください。</p>
+  <form id="login-touch-form" method="post" action="/login/touch">
     <input type="hidden" name="next" value="{{ next }}">
-    <label>カードID <input name="card_id" required></label>
+    <label>カードID <input id="login-card-id-input" name="card_id" required></label>
     <div class="actions">
       <button class="btn" type="submit">タッチでログイン</button>
       <a class="btn btn-secondary" href="/">戻る</a>

@@ -26,6 +26,46 @@ class ReaderApiClient:
             res.raise_for_status()
             return res.json()
 
+    def get_touch_panel_action(self) -> dict:
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.get(f"{self.base_url}/api/attendance/touch-panel/action", headers=self._headers)
+            res.raise_for_status()
+            return res.json()
+
+    def get_kiosk_mode(self) -> dict:
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.get(f"{self.base_url}/api/reader/kiosk-mode", headers=self._headers)
+            res.raise_for_status()
+            return res.json()
+
+    def capture_admin_login_card(self, card_id: str, reader_name: str | None, detected_at: datetime) -> dict:
+        payload = {"card_id": card_id, "reader_name": reader_name, "detected_at": detected_at.isoformat()}
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.post(f"{self.base_url}/api/reader/captures/admin-login", json=payload, headers=self._headers)
+            res.raise_for_status()
+            return res.json()
+
+    def capture_student_card(self, card_id: str, reader_name: str | None, detected_at: datetime) -> dict:
+        payload = {"card_id": card_id, "reader_name": reader_name, "detected_at": detected_at.isoformat()}
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.post(f"{self.base_url}/api/reader/captures/student-card", json=payload, headers=self._headers)
+            res.raise_for_status()
+            return res.json()
+
+    def capture_term_total(self, card_id: str, reader_name: str | None, detected_at: datetime) -> dict:
+        payload = {"card_id": card_id, "reader_name": reader_name, "detected_at": detected_at.isoformat()}
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.post(f"{self.base_url}/api/reader/captures/term-total", json=payload, headers=self._headers)
+            res.raise_for_status()
+            return res.json()
+
+    def capture_touch_error(self, message: str, detected_at: datetime) -> dict:
+        payload = {"message": message, "detected_at": detected_at.isoformat()}
+        with httpx.Client(timeout=self.timeout) as client:
+            res = client.post(f"{self.base_url}/api/reader/captures/touch-error", json=payload, headers=self._headers)
+            res.raise_for_status()
+            return res.json()
+
     def confirm_touch(self, touch_token: str, action: str, now: datetime) -> dict:
         payload = {"action": action, "now": now.isoformat()}
         with httpx.Client(timeout=self.timeout) as client:
