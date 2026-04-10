@@ -2,29 +2,33 @@
 {% block content %}
 <section class="card">
   <h1>本日イベント一覧</h1>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>学生ID</th>
-        <th>操作</th>
-        <th>時刻</th>
-        <th>ソース</th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for e in events %}
-      <tr>
-        <td>{{ e.id }}</td>
-        <td>{{ e.student_id }}</td>
-        <td>{{ event_type_labels.get(e.event_type, e.event_type) }}</td>
-        <td>{{ e.occurred_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td>{{ source_labels.get(e.source, e.source) }}</td>
-      </tr>
-      {% else %}
-      <tr><td colspan="5">イベントがありません</td></tr>
-      {% endfor %}
-    </tbody>
-  </table>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>学籍番号</th>
+          <th>氏名</th>
+          <th>操作</th>
+          <th>時刻</th>
+          <th>ソース</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in events %}
+        <tr>
+          <td>{{ e.id }}</td>
+          <td>{{ e.student_code }}</td>
+          <td>{{ e.student_name }}</td>
+          <td>{{ event_type_labels.get(e.event_type, e.event_type) }}</td>
+          <td>{{ e.occurred_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+          <td>{{ source_labels.get(e.source, e.source) }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6">イベントがありません</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
 {% endblock %}

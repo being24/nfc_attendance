@@ -9,7 +9,7 @@
         <th>氏名</th>
         <th>入室時刻</th>
         <th>状態</th>
-        <th>累計在室時間(分)</th>
+        <th>累計在室時間</th>
       </tr>
     </thead>
     <tbody>
@@ -19,7 +19,7 @@
         <td>{{ row.name }}</td>
         <td>{{ row.entered_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
         <td>{{ status_labels.get(row.current_status, row.current_status) }}</td>
-        <td>{{ row.cumulative_minutes }}</td>
+        <td>{{ (row.cumulative_minutes // 60) }}時間{{ (row.cumulative_minutes % 60) }}分</td>
       </tr>
       {% else %}
       <tr><td colspan="5">在室者はいません</td></tr>
