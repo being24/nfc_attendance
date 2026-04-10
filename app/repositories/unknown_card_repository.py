@@ -24,3 +24,7 @@ class UnknownCardRepository:
 
     def list(self) -> list[UnknownCardLog]:
         return list(self.db.scalars(select(UnknownCardLog).order_by(UnknownCardLog.id)).all())
+
+    def get_latest(self) -> UnknownCardLog | None:
+        stmt = select(UnknownCardLog).order_by(UnknownCardLog.detected_at.desc(), UnknownCardLog.id.desc()).limit(1)
+        return self.db.scalar(stmt)

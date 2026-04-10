@@ -4,6 +4,7 @@ import pytest
 
 from app.domain.enums import AttendanceAction, AttendanceStatus
 from app.domain.time_utils import now_jst
+from app import realtime
 from app.schemas.student import StudentCreate
 from app.services.attendance_service import AttendanceService
 from app.services.exceptions import (
@@ -17,6 +18,17 @@ def test_prepare_touch_unknown_card(db_session):
     svc = AttendanceService(db_session)
     with pytest.raises(UnknownCardError):
         svc.prepare_touch("NOPE", "reader", now_jst())
+
+
+def test_prepare_touch_unknown_card_publishes_realtime_event(db_session, monkeypatch):
+    published = []
+    monkeypatch.setattr(realtime.attendance_event_broker, "publish", lambda event="refresh": published.append(event))
+    svc = AttendanceService(db_session)
+
+    with pytest.raises(UnknownCardError):
+        svc.prepare_touch("NOPE", "reader", now_jst())
+
+    assert published == ["refresh"]
 
 
 def test_attendance_flow_and_lock_alert(db_session):
@@ -39,6 +51,19 @@ def test_attendance_flow_and_lock_alert(db_session):
     c4 = svc.confirm_touch(p4.touch_token, AttendanceAction.LEAVE_FINAL, t1 + timedelta(minutes=120))
     assert c4.lock_alert_required is True
     assert c4.student_id == student.id
+
+
+def test_confirm_touch_publishes_realtime_event(db_session, monkeypatch):
+    published = []
+    monkeypatch.setattr(realtime.attendance_event_broker, "publish", lambda event="refresh": published.append(event))
+    StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
+    svc = AttendanceService(db_session)
+    t1 = now_jst().replace(hour=9, minute=0, second=0, microsecond=0)
+
+    pending = svc.prepare_touch("CARD1", "reader", t1)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, t1)
+
+    assert published == ["refresh"]
 
 
 def test_token_expiry(db_session):
@@ -104,3 +129,17 @@ def test_get_today_attendance_events_are_latest_first(db_session):
         AttendanceAction.LEAVE_FINAL.value,
         AttendanceAction.ENTER.value,
     ]
+
+
+def test_get_today_attendance_includes_recent_unknown_card_alert(db_session):
+    svc = AttendanceService(db_session)
+    detected_at = now_jst()
+
+    with pytest.raises(UnknownCardError):
+        svc.prepare_touch("NO_CARD", "reader-a", detected_at)
+
+    today = svc.get_today_attendance()
+
+    assert today.unknown_card_alert is not None
+    assert today.unknown_card_alert.card_id == "NO_CARD"
+    assert today.unknown_card_alert.reader_name == "reader-a"

@@ -57,6 +57,20 @@ body {
 .hero { text-align: center; padding: 1.4rem 1rem 1.2rem; }
 .hero h1 { margin: 0 0 0.45rem; font-size: 1.8rem; }
 .hero p { margin: 0; color: var(--muted); }
+.unknown-card-alert {
+  border-color: rgba(179, 38, 30, 0.24);
+  background: linear-gradient(180deg, #fff7f6 0%, #fff2f1 100%);
+}
+.unknown-card-alert h2 {
+  margin-bottom: 0.35rem;
+  color: var(--alert);
+}
+.unknown-card-alert p {
+  margin: 0;
+}
+.is-hidden {
+  display: none;
+}
 .actions { margin-top: 1rem; display: flex; gap: 0.6rem; flex-wrap: wrap; }
 
 .top-layout {

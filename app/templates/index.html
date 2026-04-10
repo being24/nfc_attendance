@@ -24,6 +24,25 @@
       <h1>学生証をタッチしてください</h1>
     </section>
 
+    <section
+      id="unknown-card-alert"
+      class="card unknown-card-alert{% if not unknown_card_alert %} is-hidden{% endif %}"
+      aria-live="assertive"
+    >
+      {% if unknown_card_alert %}
+      <h2>未登録カード</h2>
+      <p>
+        カードID: <strong>{{ unknown_card_alert.card_id }}</strong>
+        {% if unknown_card_alert.reader_name %}
+        / reader: {{ unknown_card_alert.reader_name }}
+        {% endif %}
+      </p>
+      {% else %}
+      <h2>未登録カード</h2>
+      <p></p>
+      {% endif %}
+    </section>
+
     <section class="card touch-panel">
       <h2>打刻操作</h2>
       <form method="post" action="/touch/manual">

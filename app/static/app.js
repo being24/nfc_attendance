@@ -3,6 +3,12 @@ document.body.addEventListener("htmx:responseError", function () {
 });
 
 const ATTENDANCE_POLL_INTERVAL_MS = 15000;
+const UNKNOWN_CARD_ALERT_DURATION_MS = 10000;
+let unknownCardAlertTimerId = null;
+let attendancePollTimerId = null;
+let attendanceRefreshInFlight = false;
+let attendanceEventSource = null;
+let attendanceSseFallbackActive = false;
 
 function escapeHtml(value) {
   return String(value)
@@ -122,11 +128,43 @@ function updateRecentEvents(events) {
   }).join("");
 }
 
+function updateUnknownCardAlert(alert) {
+  const card = document.getElementById("unknown-card-alert");
+  if (!card) {
+    return;
+  }
+
+  if (unknownCardAlertTimerId !== null) {
+    window.clearTimeout(unknownCardAlertTimerId);
+    unknownCardAlertTimerId = null;
+  }
+
+  if (!alert) {
+    card.classList.add("is-hidden");
+    return;
+  }
+
+  const readerSuffix = alert.reader_name ? ` / reader: ${escapeHtml(alert.reader_name)}` : "";
+  card.innerHTML = `
+    <h2>未登録カード</h2>
+    <p>カードID: <strong>${escapeHtml(alert.card_id)}</strong>${readerSuffix}</p>
+  `;
+  card.classList.remove("is-hidden");
+  unknownCardAlertTimerId = window.setTimeout(() => {
+    card.classList.add("is-hidden");
+    unknownCardAlertTimerId = null;
+  }, UNKNOWN_CARD_ALERT_DURATION_MS);
+}
+
 async function refreshTodayAttendance() {
   if (window.location.pathname !== "/") {
     return;
   }
+  if (attendanceRefreshInFlight) {
+    return;
+  }
 
+  attendanceRefreshInFlight = true;
   try {
     const response = await window.fetch("/api/attendance/today", {
       headers: { Accept: "application/json" },
@@ -139,9 +177,22 @@ async function refreshTodayAttendance() {
     const payload = await response.json();
     updateInRoom(payload.in_room || []);
     updateRecentEvents(payload.events || []);
+    updateUnknownCardAlert(payload.unknown_card_alert || null);
   } catch (error) {
     console.warn("Failed to refresh attendance", error);
+  } finally {
+    attendanceRefreshInFlight = false;
   }
+}
+
+function scheduleTopDashboardRefresh(delayMs = ATTENDANCE_POLL_INTERVAL_MS) {
+  if (attendancePollTimerId !== null) {
+    window.clearTimeout(attendancePollTimerId);
+  }
+  attendancePollTimerId = window.setTimeout(async () => {
+    await refreshTodayAttendance();
+    scheduleTopDashboardRefresh();
+  }, delayMs);
 }
 
 function initTopDashboard() {
@@ -150,7 +201,31 @@ function initTopDashboard() {
   }
 
   refreshTodayAttendance();
-  window.setInterval(refreshTodayAttendance, ATTENDANCE_POLL_INTERVAL_MS);
+  if ("EventSource" in window) {
+    attendanceEventSource = new window.EventSource("/api/attendance/stream");
+    attendanceEventSource.onmessage = function () {
+      attendanceSseFallbackActive = false;
+      refreshTodayAttendance();
+    };
+    attendanceEventSource.onerror = function () {
+      console.warn("Attendance SSE connection failed");
+      if (!attendanceSseFallbackActive) {
+        attendanceSseFallbackActive = true;
+        scheduleTopDashboardRefresh(1000);
+      }
+    };
+  } else {
+    scheduleTopDashboardRefresh();
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) {
+      refreshTodayAttendance();
+      if (!attendanceEventSource) {
+        scheduleTopDashboardRefresh();
+      }
+    }
+  });
 }
 
 initCardIdInputFocus();

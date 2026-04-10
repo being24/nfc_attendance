@@ -22,6 +22,13 @@ class InRoomEntry(BaseModel):
     cumulative_minutes: int
 
 
+class UnknownCardAlertResponse(BaseModel):
+    card_id: str
+    reader_name: str | None = None
+    detected_at: datetime
+
+
 class TodayAttendanceResponse(BaseModel):
     in_room: list[InRoomEntry]
     events: list[AttendanceEventResponse]
+    unknown_card_alert: UnknownCardAlertResponse | None = None

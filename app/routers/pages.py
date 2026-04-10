@@ -57,6 +57,7 @@ def index_page(
             "action_options": [a.value for a in AttendanceAction],
             "in_room": today.in_room,
             "recent_events": today.events[:5],
+            "unknown_card_alert": today.unknown_card_alert,
             "event_type_labels": ACTION_LABELS,
         },
     )

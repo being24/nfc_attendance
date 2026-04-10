@@ -10,9 +10,11 @@ from app.domain.time_utils import ensure_jst, from_unix_seconds, minutes_between
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.student_repository import StudentRepository
 from app.repositories.unknown_card_repository import UnknownCardRepository
+from app.realtime import attendance_event_broker
 from app.models.attendance_session import AttendanceSession
 from app.models.student import Student
 from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, TodayAttendanceResponse
+from app.schemas.attendance import UnknownCardAlertResponse
 from app.schemas.reader import ReaderTouchConfirmResponse, ReaderTouchResponse
 from app.services.audit_service import AuditService
 from app.services.exceptions import (
@@ -26,6 +28,7 @@ from app.services.exceptions import (
 
 class AttendanceService:
     PENDING_TTL_SECONDS = 20
+    UNKNOWN_CARD_ALERT_WINDOW_SECONDS = 30
     _shared_pending_touches: dict[str, PendingTouch] = {}
 
     def __init__(self, db: Session):
@@ -46,6 +49,7 @@ class AttendanceService:
         student = self.student_repo.get_by_card_id(card_id)
         if student is None:
             self.unknown_repo.create(card_id=card_id, reader_name=reader_name, detected_at=detected_at)
+            attendance_event_broker.publish()
             raise UnknownCardError("未登録のカードです")
         if not student.is_active:
             raise InactiveStudentError("非アクティブな学生です")
@@ -136,6 +140,7 @@ class AttendanceService:
                 )
 
         self._pending_touches.pop(touch_token, None)
+        attendance_event_broker.publish()
 
         return ReaderTouchConfirmResponse(
             student_id=pending.student_id,
@@ -267,4 +272,20 @@ class AttendanceService:
             for e, student in self.att_repo.list_today_events(now.date())
         ]
 
-        return TodayAttendanceResponse(in_room=in_room, events=events)
+        latest_unknown = self.unknown_repo.get_latest()
+        unknown_card_alert = None
+        if latest_unknown is not None:
+            detected_at = from_unix_seconds(latest_unknown.detected_at)
+            age_seconds = (ensure_jst(now) - detected_at).total_seconds()
+            if 0 <= age_seconds <= self.UNKNOWN_CARD_ALERT_WINDOW_SECONDS:
+                unknown_card_alert = UnknownCardAlertResponse(
+                    card_id=latest_unknown.card_id,
+                    reader_name=latest_unknown.reader_name,
+                    detected_at=detected_at,
+                )
+
+        return TodayAttendanceResponse(
+            in_room=in_room,
+            events=events,
+            unknown_card_alert=unknown_card_alert,
+        )

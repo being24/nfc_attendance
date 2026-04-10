@@ -46,13 +46,23 @@ uv run python -m pytest -q
 - `DATABASE_URL`（default: `sqlite:///./attendance.db`）
 - `API_BASE_URL`（default: `http://127.0.0.1:8000`、reader用）
 - `READER_TOKEN`（default: `dev-reader-token`）
-- `READER_NAME`（default: `dummy-reader`、reader用）
+- `READER_NAME`（default: 未設定時は自動切替。実機=`real-reader`、ダミー=`dummy-reader`）
+- `READER_DEVICE_KEYWORD`（default: `SONY FeliCa`、実機reader用）
 - `SESSION_SECRET_KEY`（default: `dev-session-secret`）
 - `ADMIN_USERNAME`（default: `admin`）
 - `ADMIN_PASSWORD`（default: `admin`）
 - `ADMIN_CARD_IDS`（default: `ADMIN-CARD-001`、カンマ区切り）
 
-## Readerプロセス起動（ダミー運用可）
+## Readerプロセス起動（実機 / ダミー）
+
+実機 reader を使う場合は、PC/SC が使える環境で `pyscard` と対応 reader を用意してください。
+
+```bash
+# 実機 reader の待受を開始（カード挿入で自動送信）
+uv run python -m reader.main
+```
+
+`--card-id` を指定しない場合は、`READER_DEVICE_KEYWORD` に一致する reader を監視します。
 
 実機リーダーが無くても、ダミーreaderでAPI連携を検証できます。
 
@@ -68,6 +78,7 @@ uv run python -m reader.main --base-url http://127.0.0.1:8000 --card-id CARD1 --
 - `--action ENTER|LEAVE_TEMP|RETURN|LEAVE_FINAL|auto`（default: `auto`）
 - `--reader-token`（default: `dev-reader-token`）
 - `--interval` / `--cooldown`
+- `--device-keyword`（default: `SONY FeliCa`、実機reader用）
 
 ## API概要
 
