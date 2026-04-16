@@ -12,6 +12,8 @@
 body {
   margin: 0;
   font-family: "Noto Sans JP", sans-serif;
+  font-size: 18px;
+  line-height: 1.6;
   background: linear-gradient(180deg, #eef5f0 0%, #f9fcfa 100%);
   color: var(--ink);
 }
@@ -38,7 +40,7 @@ body {
   font-weight: 600;
 }
 
-.brand { font-size: 1.1rem; }
+.brand { font-size: 1.25rem; }
 
 .container {
   width: min(100%, 1680px);
@@ -55,8 +57,12 @@ body {
 }
 
 .hero { text-align: center; padding: 1.4rem 1rem 1.2rem; }
-.hero h1 { margin: 0 0 0.45rem; font-size: 1.8rem; }
+.hero h1 { margin: 0 0 0.45rem; font-size: 2.25rem; }
 .hero p { margin: 0; color: var(--muted); }
+.card h1 {
+  margin: 0 0 0.8rem;
+  font-size: 1.75rem;
+}
 .unknown-card-alert {
   border-color: rgba(179, 38, 30, 0.24);
   background: linear-gradient(180deg, #fff7f6 0%, #fff2f1 100%);
@@ -142,7 +148,9 @@ body {
   display: inline-block;
   border: none;
   border-radius: 8px;
-  padding: 0.55rem 0.9rem;
+  padding: 0.7rem 1rem;
+  font-size: 1rem;
+  font-weight: 700;
   background: var(--accent);
   color: #fff;
   text-decoration: none;
@@ -160,19 +168,19 @@ body {
 .touch-action-banner-label {
   margin: 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
   letter-spacing: 0.06em;
 }
 .touch-action-banner-value {
   margin: 0.2rem 0 0;
-  font-size: 2rem;
+  font-size: 2.35rem;
   font-weight: 800;
   line-height: 1.1;
 }
 .touch-action-banner-help {
   margin: 0.45rem 0 0;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 .touch-action-enter {
   background: linear-gradient(180deg, #eef9f3 0%, #e1f4e9 100%);
@@ -195,7 +203,7 @@ body {
 .capture-status {
   margin: 0 0 1rem;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 table {
@@ -219,13 +227,15 @@ table {
 th, td {
   border-bottom: 1px solid var(--border);
   text-align: left;
-  padding: 0.5rem;
-  font-size: 0.95rem;
+  padding: 0.7rem;
+  font-size: 1rem;
 }
 
 label {
   display: block;
   margin: 0.5rem 0;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 .checkbox-field {
@@ -243,7 +253,7 @@ input, textarea {
   width: 100%;
   border: 1px solid var(--border);
   border-radius: 8px;
-  padding: 0.45rem;
+  padding: 0.65rem 0.7rem;
   font: inherit;
 }
 
@@ -256,8 +266,8 @@ input, textarea {
 
 .touch-btn {
   width: 100%;
-  min-height: 96px;
-  font-size: 1.25rem;
+  min-height: 108px;
+  font-size: 1.4rem;
   font-weight: 700;
   display: flex;
   flex-direction: column;
@@ -268,12 +278,12 @@ input, textarea {
 
 .touch-btn-title {
   display: block;
-  font-size: 1.25rem;
+  font-size: 1.4rem;
 }
 
 .touch-btn-note {
   display: block;
-  font-size: 0.8rem;
+  font-size: 0.95rem;
   font-weight: 500;
   opacity: 0.88;
 }
@@ -304,7 +314,7 @@ input, textarea {
 .section-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
 }
 
 .name-list {
@@ -338,14 +348,14 @@ input, textarea {
 .name-pill strong,
 .event-main strong {
   display: block;
-  font-size: 1rem;
+  font-size: 1.1rem;
 }
 
 .name-pill span,
 .event-main span,
 .event-meta time {
   color: var(--muted);
-  font-size: 0.9rem;
+  font-size: 1rem;
 }
 
 .recent-events-list {
@@ -374,6 +384,7 @@ input, textarea {
 .event-type {
   color: var(--accent);
   font-weight: 700;
+  font-size: 1rem;
 }
 
 .empty-text {
@@ -420,7 +431,10 @@ input, textarea {
 
 @media (max-width: 640px) {
   .topbar { flex-direction: column; align-items: flex-start; }
-  th, td { font-size: 0.86rem; }
+  body { font-size: 16px; }
+  .hero h1 { font-size: 1.9rem; }
+  .card h1 { font-size: 1.5rem; }
+  th, td { font-size: 0.95rem; }
   .container {
     width: 100%;
     padding: 0 0.85rem 1.5rem;
@@ -439,7 +453,7 @@ input, textarea {
   .event-meta { justify-items: start; text-align: left; }
   .touch-grid { grid-template-columns: 1fr; }
   .touch-btn {
-    min-height: 88px;
-    font-size: 1.15rem;
+    min-height: 96px;
+    font-size: 1.2rem;
   }
 }

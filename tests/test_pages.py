@@ -36,6 +36,39 @@ def test_admin_pages(client):
         assert res.status_code == 200
 
 
+def test_admin_student_edit_can_update_student_code(client):
+    login_res = client.post(
+        "/login",
+        data={"username": "admin", "password": "admin", "next": "/admin/students"},
+        follow_redirects=False,
+    )
+    assert login_res.status_code == 303
+
+    create_res = client.post(
+        "/api/students",
+        json={"student_code": "S101", "name": "Edit Target", "card_id": "CARD101"},
+    )
+    assert create_res.status_code == 201
+    student_id = create_res.json()["id"]
+
+    update_res = client.post(
+        f"/admin/students/{student_id}",
+        data={
+            "student_code": "S999",
+            "name": "Edit Target",
+            "card_id": "CARD101",
+            "is_active": "true",
+        },
+        follow_redirects=False,
+    )
+    assert update_res.status_code == 303
+    assert update_res.headers["location"] == "/admin/students"
+
+    student_res = client.get(f"/api/students/{student_id}")
+    assert student_res.status_code == 200
+    assert student_res.json()["student_code"] == "S999"
+
+
 def test_simulate_touch_unknown_card_shows_error_page(client):
     res = client.post(
         "/touch/simulate",

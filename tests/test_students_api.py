@@ -20,3 +20,7 @@ def test_students_api_crud(client):
     patch_res = client.patch(f"/api/students/{student_id}", json={"name": "Jiro"})
     assert patch_res.status_code == 200
     assert patch_res.json()["name"] == "Jiro"
+
+    patch_code_res = client.patch(f"/api/students/{student_id}", json={"student_code": "S101"})
+    assert patch_code_res.status_code == 200
+    assert patch_code_res.json()["student_code"] == "S101"

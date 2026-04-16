@@ -12,6 +12,7 @@ class StudentCreate(BaseModel):
 
 
 class StudentUpdate(BaseModel):
+    student_code: str | None = Field(default=None, min_length=1)
     name: str | None = None
     card_id: str | None = None
     is_admin: bool | None = None

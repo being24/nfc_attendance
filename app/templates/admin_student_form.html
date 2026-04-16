@@ -15,11 +15,7 @@
     {% endif %}
   </p>
   <form method="post" action="{{ '/admin/students' if form_mode == 'create' else '/admin/students/' ~ student.id }}">
-    {% if form_mode == "create" %}
-    <label>学籍番号 <input name="student_code" required></label>
-    {% else %}
-    <label>学籍番号 <input value="{{ student.student_code }}" disabled></label>
-    {% endif %}
+    <label>学籍番号 <input name="student_code" value="{{ student.student_code if student else '' }}" required></label>
 
     <label>氏名 <input name="name" value="{{ student.name if student else '' }}" required></label>
     <label>カードID <input id="student-card-id-input" name="card_id" value="{{ student.card_id if student else '' }}" required></label>

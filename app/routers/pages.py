@@ -282,6 +282,7 @@ def admin_student_create(
 def admin_student_update(
     request: Request,
     student_id: int,
+    student_code: str = Form(...),
     name: str = Form(...),
     card_id: str = Form(...),
     is_admin: bool = Form(False),
@@ -295,7 +296,14 @@ def admin_student_update(
     try:
         student_service.update_student(
             student_id,
-            StudentUpdate(name=name, card_id=card_id, is_admin=is_admin, note=note or None, is_active=is_active),
+            StudentUpdate(
+                student_code=student_code,
+                name=name,
+                card_id=card_id,
+                is_admin=is_admin,
+                note=note or None,
+                is_active=is_active,
+            ),
         )
     except StudentNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
