@@ -151,6 +151,15 @@ class AttendanceRepository:
         )
         return list(self.db.execute(stmt).all())
 
+    def list_students_with_open_sessions(self) -> list[tuple[Student, AttendanceSession, AttendanceStatusModel]]:
+        stmt = (
+            select(Student, AttendanceSession, AttendanceStatusModel)
+            .join(AttendanceSession, and_(AttendanceSession.student_id == Student.id, AttendanceSession.left_at.is_(None)))
+            .join(AttendanceStatusModel, AttendanceStatusModel.student_id == Student.id)
+            .order_by(Student.student_code, Student.id)
+        )
+        return list(self.db.execute(stmt).all())
+
     def list_open_sessions_started_before(self, cutoff: datetime) -> list[AttendanceSession]:
         cutoff_ts = to_unix_seconds(cutoff)
         stmt = (

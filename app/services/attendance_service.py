@@ -16,7 +16,7 @@ from app.realtime import attendance_event_broker
 from app.touch_panel import touch_panel_state
 from app.models.attendance_session import AttendanceSession
 from app.models.student import Student
-from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, TermTotalLookupResponse, TodayAttendanceResponse
+from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, StudentCurrentTimeEntry, TermTotalLookupResponse, TodayAttendanceResponse
 from app.schemas.attendance import LockAlertResponse, TouchPanelErrorResponse, UnknownCardAlertResponse
 from app.schemas.reader import ReaderTouchConfirmResponse, ReaderTouchResponse
 from app.services.audit_service import AuditService
@@ -33,6 +33,7 @@ class AttendanceService:
     PENDING_TTL_SECONDS = 20
     UNKNOWN_CARD_ALERT_WINDOW_SECONDS = 30
     LOCK_ALERT_WINDOW_SECONDS = 30
+    CURRENT_TIME_TARGETS = {"all", "active", "in_room"}
     _shared_pending_touches: dict[str, PendingTouch] = {}
 
     def __init__(self, db: Session):
@@ -300,6 +301,57 @@ class AttendanceService:
                 break_minutes_in_business += minutes_between(overlap_start, overlap_end)
 
         return max(0, business_minutes - break_minutes_in_business)
+
+    def list_student_current_times(self, target: str = "all", now: datetime | None = None) -> list[StudentCurrentTimeEntry]:
+        if target not in self.CURRENT_TIME_TARGETS:
+            raise ValueError(f"unknown target: {target}")
+
+        current = ensure_jst(now or now_jst())
+        self._close_stale_open_sessions(current)
+
+        students = sorted(
+            self.student_repo.list_all(include_inactive=True),
+            key=lambda student: (student.student_code, student.id),
+        )
+        open_session_rows = {
+            student.id: (session, status)
+            for student, session, status in self.att_repo.list_students_with_open_sessions()
+        }
+
+        entries: list[StudentCurrentTimeEntry] = []
+        for student in students:
+            session_row = open_session_rows.get(student.id)
+            if session_row is not None:
+                session, status = session_row
+                entered_at_dt = from_unix_seconds(session.entered_at)
+                cumulative = self._compute_net_minutes(entered_at_dt, current, session.id)
+                business_cumulative = self.compute_9_to_17_minutes(entered_at_dt, current, session.id)
+                current_status = status.current_status
+            else:
+                entered_at_dt = None
+                cumulative = 0
+                business_cumulative = 0
+                current_status = self._get_current_status(student.id).value
+
+            if target == "active" and not student.is_active:
+                continue
+            if target == "in_room" and current_status != AttendanceStatus.IN_ROOM.value:
+                continue
+
+            entries.append(
+                StudentCurrentTimeEntry(
+                    student_id=student.id,
+                    student_code=student.student_code,
+                    name=student.name,
+                    is_active=student.is_active,
+                    current_status=current_status,
+                    entered_at=entered_at_dt,
+                    cumulative_minutes=cumulative,
+                    business_cumulative_minutes=business_cumulative,
+                )
+            )
+
+        return entries
 
     def get_today_attendance(self) -> TodayAttendanceResponse:
         now = now_jst()

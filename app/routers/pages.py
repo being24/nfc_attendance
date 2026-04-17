@@ -193,6 +193,36 @@ def admin_today_page(
     )
 
 
+@router.get("/admin/current-times", response_class=HTMLResponse)
+def admin_current_times_page(
+    request: Request,
+    target: str = Query("all"),
+    attendance_service: AttendanceService = Depends(get_attendance_service),
+):
+    redirect = require_admin_page_auth(request)
+    if redirect:
+        return redirect
+    kiosk_state.set_mode(KioskMode.ATTENDANCE)
+    if target not in AttendanceService.CURRENT_TIME_TARGETS:
+        raise HTTPException(status_code=400, detail="不正な表示対象です")
+    entries = attendance_service.list_student_current_times(target=target)
+    return templates.TemplateResponse(
+        request,
+        "admin_current_times.html",
+        {
+            "title": "現在時間一覧",
+            "entries": entries,
+            "target": target,
+            "status_labels": STATUS_LABELS,
+            "target_labels": {
+                "all": "全員",
+                "active": "有効のみ",
+                "in_room": "在室中のみ",
+            },
+        },
+    )
+
+
 @router.get("/admin/students", response_class=HTMLResponse)
 def admin_students_page(
     request: Request,

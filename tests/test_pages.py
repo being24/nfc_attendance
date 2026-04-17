@@ -1,4 +1,8 @@
 
+from app.schemas.student import StudentCreate
+from app.services.student_service import StudentService
+
+
 def test_index_page(client):
     client.post(
         "/api/students",
@@ -27,6 +31,7 @@ def test_admin_pages(client):
 
     for path in [
         "/admin/today",
+        "/admin/current-times",
         "/admin/students",
         "/admin/students/new",
         "/admin/events",
@@ -57,6 +62,42 @@ def test_admin_today_shows_actual_and_business_minutes(client):
     assert res.status_code == 200
     assert "累計在室時間" in res.text
     assert "9-17換算" in res.text
+
+
+def test_admin_current_times_sorted_by_student_code_and_filterable(client, db_session):
+    login_res = client.post(
+        "/login",
+        data={"username": "admin", "password": "admin", "next": "/admin/current-times"},
+        follow_redirects=False,
+    )
+    assert login_res.status_code == 303
+
+    student_service = StudentService(db_session)
+    student_service.register_student(StudentCreate(student_code="S002", name="Outside User", card_id="CARD202"))
+    student_service.register_student(StudentCreate(student_code="S001", name="In Room User", card_id="CARD201"))
+    inactive = student_service.register_student(StudentCreate(student_code="S003", name="Inactive User", card_id="CARD203"))
+    student_service.deactivate_student(inactive.id)
+
+    client.post(
+        "/touch/simulate",
+        data={"card_id": "CARD201", "action": "ENTER"},
+    )
+
+    res_all = client.get("/admin/current-times?target=all")
+    assert res_all.status_code == 200
+    assert res_all.text.index("S001") < res_all.text.index("S002") < res_all.text.index("S003")
+
+    res_active = client.get("/admin/current-times?target=active")
+    assert res_active.status_code == 200
+    assert "S001" in res_active.text
+    assert "S002" in res_active.text
+    assert "S003" not in res_active.text
+
+    res_in_room = client.get("/admin/current-times?target=in_room")
+    assert res_in_room.status_code == 200
+    assert "S001" in res_in_room.text
+    assert "S002" not in res_in_room.text
+    assert "S003" not in res_in_room.text
 
 
 def test_admin_student_edit_can_update_student_code(client):

@@ -158,6 +158,15 @@ body {
 }
 
 .btn-secondary { background: #6b7f73; }
+.filter-bar {
+  display: flex;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+.filter-btn-active {
+  background: #0d7f5d;
+}
 .touch-action-banner {
   margin: 0 0 1rem;
   padding: 1rem 1.1rem;

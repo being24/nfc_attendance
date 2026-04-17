@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>現在時間一覧</h1>
+  <div class="filter-bar" role="tablist" aria-label="表示対象">
+    {% for key, label in target_labels.items() %}
+    <a
+      href="/admin/current-times?target={{ key }}"
+      class="btn {% if target == key %}filter-btn-active{% else %}btn-secondary{% endif %}"
+      aria-current="{% if target == key %}page{% else %}false{% endif %}"
+    >{{ label }}</a>
+    {% endfor %}
+  </div>
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>学籍番号</th>
+          <th>氏名</th>
+          <th>状態</th>
+          <th>在籍</th>
+          <th>入室時刻</th>
+          <th>累計在室時間</th>
+          <th>9-17時間</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in entries %}
+        <tr>
+          <td>{{ row.student_code }}</td>
+          <td>{{ row.name }}</td>
+          <td>{{ status_labels.get(row.current_status, row.current_status) }}</td>
+          <td>{{ "有効" if row.is_active else "無効" }}</td>
+          <td>{{ row.entered_at.strftime('%Y-%m-%d %H:%M:%S') if row.entered_at else "-" }}</td>
+          <td>{{ (row.cumulative_minutes // 60) }}時間{{ (row.cumulative_minutes % 60) }}分</td>
+          <td>{{ (row.business_cumulative_minutes // 60) }}時間{{ (row.business_cumulative_minutes % 60) }}分</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7">対象の学生はいません</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

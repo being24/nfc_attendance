@@ -23,6 +23,17 @@ class InRoomEntry(BaseModel):
     business_cumulative_minutes: int
 
 
+class StudentCurrentTimeEntry(BaseModel):
+    student_id: int
+    student_code: str
+    name: str
+    is_active: bool
+    current_status: str
+    entered_at: datetime | None = None
+    cumulative_minutes: int
+    business_cumulative_minutes: int
+
+
 class UnknownCardAlertResponse(BaseModel):
     card_id: str
     reader_name: str | None = None
