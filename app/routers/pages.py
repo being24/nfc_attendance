@@ -41,6 +41,19 @@ SOURCE_LABELS = {
 }
 
 
+def build_touch_result_message(card_id: str, action: str, action_label: str, next_status_label: str) -> str:
+    action_messages = {
+        AttendanceAction.ENTER.value: "入室しました",
+        AttendanceAction.LEAVE_TEMP.value: "一時退出しました",
+        AttendanceAction.RETURN.value: "再入室しました",
+        AttendanceAction.LEAVE_FINAL.value: "退出しました",
+    }
+    message = action_messages.get(action)
+    if message:
+        return f"{message}（カードID: {card_id} / 次状態: {next_status_label}）"
+    return f"カード {card_id} を「{action_label}」で処理しました（次状態: {next_status_label}）"
+
+
 @router.get("/", response_class=HTMLResponse)
 def index_page(
     request: Request,
@@ -96,7 +109,12 @@ def manual_touch(
         "touch_result.html",
         {
             "title": "打刻完了",
-            "message": f"カード {card_id} を「{chosen_label}」で処理しました（次状態: {next_status_label}）",
+            "message": build_touch_result_message(
+                card_id=card_id,
+                action=chosen,
+                action_label=chosen_label,
+                next_status_label=next_status_label,
+            ),
             "lock_alert_required": confirm.lock_alert_required,
         },
     )

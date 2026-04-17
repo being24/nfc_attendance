@@ -89,6 +89,7 @@ def test_simulate_touch_success_page(client):
     )
     assert res.status_code == 200
     assert "打刻完了" in res.text
+    assert "入室しました" in res.text
     assert "5秒後に待受画面へ戻ります。" in res.text
 
 
