@@ -1,6 +1,11 @@
 
+from app.domain.enums import AttendanceAction
+from app.config import get_settings
+from app.services.attendance_service import AttendanceService
 from app.schemas.student import StudentCreate
 from app.services.student_service import StudentService
+
+settings = get_settings()
 
 
 def test_index_page(client):
@@ -16,7 +21,7 @@ def test_index_page(client):
     assert res.status_code == 200
     assert "学生証をタッチしてください" in res.text
     assert "現在の在室者" in res.text
-    assert "直近の入退室ログ" in res.text
+    assert "直近の入退室" in res.text
     assert "Alice" in res.text
     assert "1名在室中" in res.text
 
@@ -24,7 +29,7 @@ def test_index_page(client):
 def test_admin_pages(client):
     login_res = client.post(
         "/login",
-        data={"username": "admin", "password": "admin", "next": "/admin/today"},
+        data={"username": settings.admin_username, "password": settings.admin_password, "next": "/admin/today"},
         follow_redirects=False,
     )
     assert login_res.status_code == 303
@@ -44,7 +49,7 @@ def test_admin_pages(client):
 def test_admin_today_shows_actual_and_business_minutes(client):
     login_res = client.post(
         "/login",
-        data={"username": "admin", "password": "admin", "next": "/admin/today"},
+        data={"username": settings.admin_username, "password": settings.admin_password, "next": "/admin/today"},
         follow_redirects=False,
     )
     assert login_res.status_code == 303
@@ -67,7 +72,7 @@ def test_admin_today_shows_actual_and_business_minutes(client):
 def test_admin_current_times_sorted_by_student_code_and_filterable(client, db_session):
     login_res = client.post(
         "/login",
-        data={"username": "admin", "password": "admin", "next": "/admin/current-times"},
+        data={"username": settings.admin_username, "password": settings.admin_password, "next": "/admin/current-times"},
         follow_redirects=False,
     )
     assert login_res.status_code == 303
@@ -77,15 +82,24 @@ def test_admin_current_times_sorted_by_student_code_and_filterable(client, db_se
     student_service.register_student(StudentCreate(student_code="S001", name="In Room User", card_id="CARD201"))
     inactive = student_service.register_student(StudentCreate(student_code="S003", name="Inactive User", card_id="CARD203"))
     student_service.deactivate_student(inactive.id)
+    attendance_service = AttendanceService(db_session)
 
     client.post(
         "/touch/simulate",
         data={"card_id": "CARD201", "action": "ENTER"},
     )
+    entered_at = attendance_service.current_term_bounds()[0].replace(hour=9, minute=0, second=0, microsecond=0)
+    pending = attendance_service.prepare_touch("CARD202", "reader", entered_at)
+    attendance_service.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+    left_at = entered_at.replace(hour=10, minute=30, second=0, microsecond=0)
+    pending = attendance_service.prepare_touch("CARD202", "reader", left_at)
+    attendance_service.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, left_at)
 
     res_all = client.get("/admin/current-times?target=all")
     assert res_all.status_code == 200
     assert res_all.text.index("S001") < res_all.text.index("S002") < res_all.text.index("S003")
+    assert "Outside User" in res_all.text
+    assert "0時間0分" not in res_all.text.split("Outside User", 1)[1].split("</tr>", 1)[0]
 
     res_active = client.get("/admin/current-times?target=active")
     assert res_active.status_code == 200
@@ -103,7 +117,7 @@ def test_admin_current_times_sorted_by_student_code_and_filterable(client, db_se
 def test_admin_student_edit_can_update_student_code(client):
     login_res = client.post(
         "/login",
-        data={"username": "admin", "password": "admin", "next": "/admin/students"},
+        data={"username": settings.admin_username, "password": settings.admin_password, "next": "/admin/students"},
         follow_redirects=False,
     )
     assert login_res.status_code == 303

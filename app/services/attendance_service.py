@@ -204,6 +204,27 @@ class AttendanceService:
                 break_minutes += minutes_between(b_start, b_end)
         return max(0, gross - break_minutes)
 
+    def _compute_student_period_totals(
+        self,
+        student_id: int,
+        period_start: datetime,
+        period_end: datetime,
+        now: datetime,
+    ) -> tuple[int, int]:
+        sessions = self.att_repo.list_sessions_overlapping_period(student_id, period_start, period_end)
+        raw_total = 0
+        business_total = 0
+        for session in sessions:
+            session_start = from_unix_seconds(session.entered_at)
+            session_end = from_unix_seconds(session.left_at) if session.left_at is not None else ensure_jst(now)
+            overlap_start = max(session_start, ensure_jst(period_start))
+            overlap_end = min(session_end, ensure_jst(period_end), ensure_jst(now))
+            if overlap_end <= overlap_start:
+                continue
+            raw_total += self._compute_net_minutes_for_period(session, period_start, period_end, now)
+            business_total += self.compute_9_to_17_minutes(overlap_start, overlap_end, session.id)
+        return raw_total, business_total
+
     def current_term_bounds(self, now: datetime | None = None) -> tuple[datetime, datetime]:
         base = ensure_jst(now or now_jst())
         y = base.year
@@ -235,16 +256,7 @@ class AttendanceService:
         current = ensure_jst(now or now_jst())
         self._close_stale_open_sessions(current)
         start, end = self.current_term_bounds(current)
-        sessions = self.att_repo.list_sessions_overlapping_period(student.id, start, end)
-        total = 0
-        for session in sessions:
-            session_start = from_unix_seconds(session.entered_at)
-            session_end = from_unix_seconds(session.left_at) if session.left_at is not None else current
-            overlap_start = max(session_start, start)
-            overlap_end = min(session_end, end, current)
-            if overlap_end <= overlap_start:
-                continue
-            total += self.compute_9_to_17_minutes(overlap_start, overlap_end, session.id)
+        _, total = self._compute_student_period_totals(student.id, start, end, current)
         return student, total, start, min(end, current)
 
     def capture_current_term_total_by_card(
@@ -308,6 +320,7 @@ class AttendanceService:
 
         current = ensure_jst(now or now_jst())
         self._close_stale_open_sessions(current)
+        start, end = self.current_term_bounds(current)
 
         students = sorted(
             self.student_repo.list_all(include_inactive=True),
@@ -321,16 +334,13 @@ class AttendanceService:
         entries: list[StudentCurrentTimeEntry] = []
         for student in students:
             session_row = open_session_rows.get(student.id)
+            cumulative, business_cumulative = self._compute_student_period_totals(student.id, start, end, current)
             if session_row is not None:
                 session, status = session_row
                 entered_at_dt = from_unix_seconds(session.entered_at)
-                cumulative = self._compute_net_minutes(entered_at_dt, current, session.id)
-                business_cumulative = self.compute_9_to_17_minutes(entered_at_dt, current, session.id)
                 current_status = status.current_status
             else:
                 entered_at_dt = None
-                cumulative = 0
-                business_cumulative = 0
                 current_status = self._get_current_status(student.id).value
 
             if target == "active" and not student.is_active:

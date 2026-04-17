@@ -285,3 +285,25 @@ def test_term_total_uses_only_9_to_17_minutes(db_session):
     )
     assert student.student_code == "S004"
     assert total_minutes == 480
+
+
+def test_list_student_current_times_includes_closed_session_totals(db_session):
+    StudentService(db_session).register_student(
+        StudentCreate(student_code="S005", name="Closed User", card_id="CARD5")
+    )
+    svc = AttendanceService(db_session)
+    entered_at = now_jst().replace(hour=9, minute=0, second=0, microsecond=0)
+
+    pending = svc.prepare_touch("CARD5", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+
+    leaving_at = entered_at + timedelta(minutes=90)
+    pending = svc.prepare_touch("CARD5", "reader", leaving_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, leaving_at)
+
+    rows = svc.list_student_current_times(target="all", now=leaving_at)
+    row = next(row for row in rows if row.student_code == "S005")
+    assert row.current_status == AttendanceStatus.OUTSIDE.value
+    assert row.entered_at is None
+    assert row.cumulative_minutes == 90
+    assert row.business_cumulative_minutes == 90

@@ -1,9 +1,12 @@
 
+from app.config import get_settings
 from app.domain.time_utils import now_jst
 from app.kiosk import kiosk_state
 from app.schemas.student import StudentCreate
 from app.schemas.student import StudentUpdate
 from app.services.student_service import StudentService
+
+settings = get_settings()
 
 
 def test_admin_page_requires_login(client):
@@ -15,7 +18,7 @@ def test_admin_page_requires_login(client):
 def test_login_success_and_logout(client):
     login_res = client.post(
         "/login",
-        data={"username": "admin", "password": "admin", "next": "/admin/today"},
+        data={"username": settings.admin_username, "password": settings.admin_password, "next": "/admin/today"},
         follow_redirects=False,
     )
     assert login_res.status_code == 303
@@ -29,7 +32,7 @@ def test_login_success_and_logout(client):
     assert logout_res.headers["location"] == "/login"
 
     after_logout = client.get("/admin/today", follow_redirects=False)
-    assert after_logout.status_code == 200
+    assert after_logout.status_code == 303
     protected_after_logout = client.get("/admin/students", follow_redirects=False)
     assert protected_after_logout.status_code == 303
 

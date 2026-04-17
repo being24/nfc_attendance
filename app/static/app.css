@@ -12,7 +12,7 @@
 body {
   margin: 0;
   font-family: "Noto Sans JP", sans-serif;
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.6;
   background: linear-gradient(180deg, #eef5f0 0%, #f9fcfa 100%);
   color: var(--ink);
@@ -30,8 +30,22 @@ body {
 
 .topbar nav {
   display: flex;
+  align-items: center;
   gap: 0.8rem;
   flex-wrap: wrap;
+}
+
+.topbar nav form {
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+}
+
+.topbar nav .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.2;
 }
 
 .topbar a {
@@ -40,7 +54,7 @@ body {
   font-weight: 600;
 }
 
-.brand { font-size: 1.25rem; }
+.brand { font-size: 1.4rem; }
 
 .container {
   width: min(100%, 1680px);
@@ -57,11 +71,11 @@ body {
 }
 
 .hero { text-align: center; padding: 1.4rem 1rem 1.2rem; }
-.hero h1 { margin: 0 0 0.45rem; font-size: 2.25rem; }
+.hero h1 { margin: 0 0 0.45rem; font-size: 2.5rem; }
 .hero p { margin: 0; color: var(--muted); }
 .card h1 {
   margin: 0 0 0.8rem;
-  font-size: 1.75rem;
+  font-size: 2rem;
 }
 .unknown-card-alert {
   border-color: rgba(179, 38, 30, 0.24);
@@ -149,7 +163,7 @@ body {
   border: none;
   border-radius: 8px;
   padding: 0.7rem 1rem;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   background: var(--accent);
   color: #fff;
@@ -177,7 +191,7 @@ body {
 .touch-action-banner-label {
   margin: 0;
   color: var(--muted);
-  font-size: 0.95rem;
+  font-size: 1rem;
   letter-spacing: 0.06em;
 }
 .touch-action-banner-value {
@@ -212,7 +226,7 @@ body {
 .capture-status {
   margin: 0 0 1rem;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 table {
@@ -237,13 +251,13 @@ th, td {
   border-bottom: 1px solid var(--border);
   text-align: left;
   padding: 0.7rem;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 label {
   display: block;
   margin: 0.5rem 0;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 600;
 }
 
@@ -287,12 +301,12 @@ input, textarea {
 
 .touch-btn-title {
   display: block;
-  font-size: 1.4rem;
+  font-size: 2rem;
 }
 
 .touch-btn-note {
   display: block;
-  font-size: 0.95rem;
+  font-size: 1rem;
   font-weight: 500;
   opacity: 0.88;
 }
@@ -323,7 +337,7 @@ input, textarea {
 .section-heading p {
   margin: 0;
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .name-list {
@@ -357,14 +371,14 @@ input, textarea {
 .name-pill strong,
 .event-main strong {
   display: block;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
 }
 
 .name-pill span,
 .event-main span,
 .event-meta time {
   color: var(--muted);
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .recent-events-list {
@@ -393,12 +407,17 @@ input, textarea {
 .event-type {
   color: var(--accent);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 1.05rem;
 }
 
 .empty-text {
   margin: 0;
   color: var(--muted);
+}
+
+.name-list > .empty-text {
+  grid-column: 1 / -1;
+  width: 100%;
 }
 
 @media (max-width: 1200px) {
@@ -440,10 +459,10 @@ input, textarea {
 
 @media (max-width: 640px) {
   .topbar { flex-direction: column; align-items: flex-start; }
-  body { font-size: 16px; }
-  .hero h1 { font-size: 1.9rem; }
-  .card h1 { font-size: 1.5rem; }
-  th, td { font-size: 0.95rem; }
+  body { font-size: 18px; }
+  .hero h1 { font-size: 2.1rem; }
+  .card h1 { font-size: 1.7rem; }
+  th, td { font-size: 1rem; }
   .container {
     width: 100%;
     padding: 0 0.85rem 1.5rem;
