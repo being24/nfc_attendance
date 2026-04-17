@@ -3,8 +3,9 @@ from datetime import timedelta
 import pytest
 
 from app.domain.enums import AttendanceAction, AttendanceStatus
-from app.domain.time_utils import now_jst
+from app.domain.time_utils import from_unix_seconds, now_jst
 from app import realtime
+from app.services import attendance_service as attendance_service_module
 from app.schemas.student import StudentCreate
 from app.services.attendance_service import AttendanceService
 from app.services.exceptions import (
@@ -94,19 +95,23 @@ def test_compute_9_to_17(db_session):
     assert business == 420  # 9:00-17:00(480) - break 60
 
 
-def test_get_today_attendance_fields(db_session):
+def test_get_today_attendance_fields(db_session, monkeypatch):
     StudentService(db_session).register_student(StudentCreate(student_code="S001", name="Alice", card_id="CARD1"))
     svc = AttendanceService(db_session)
-    t = now_jst()
+    t = now_jst().replace(hour=8, minute=0, second=0, microsecond=0)
     p = svc.prepare_touch("CARD1", "reader", t)
     svc.confirm_touch(p.touch_token, AttendanceAction.ENTER, t)
 
+    now = t + timedelta(hours=2)
+    monkeypatch.setattr(attendance_service_module, "now_jst", lambda: now)
     today = svc.get_today_attendance()
     assert len(today.in_room) == 1
     row = today.in_room[0]
     assert row.student_code == "S001"
     assert row.name == "Alice"
     assert row.current_status == AttendanceStatus.IN_ROOM.value
+    assert row.cumulative_minutes == 120
+    assert row.business_cumulative_minutes == 60
     assert len(today.events) == 1
     event = today.events[0]
     assert event.student_code == "S001"
@@ -208,19 +213,20 @@ def test_get_latest_unknown_card_alert_returns_recent_entry(db_session):
     assert latest.reader_name == "reader-a"
 
 
-def test_capture_term_total_updates_today_attendance(db_session):
+def test_capture_term_total_updates_today_attendance(db_session, monkeypatch):
     StudentService(db_session).register_student(StudentCreate(student_code="S002", name="Bob", card_id="CARD2"))
     svc = AttendanceService(db_session)
-    entered_at = now_jst() - timedelta(minutes=90)
+    entered_at = now_jst().replace(hour=9, minute=0, second=0, microsecond=0)
 
     pending = svc.prepare_touch("CARD2", "reader", entered_at)
     svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
 
-    left_at = now_jst()
+    left_at = entered_at + timedelta(minutes=90)
     pending = svc.prepare_touch("CARD2", "reader", left_at)
     svc.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, left_at)
 
     result = svc.capture_current_term_total_by_card("CARD2", "reader", left_at)
+    monkeypatch.setattr(attendance_service_module, "now_jst", lambda: left_at)
     today = svc.get_today_attendance()
 
     assert result.student_code == "S002"
@@ -228,3 +234,54 @@ def test_capture_term_total_updates_today_attendance(db_session):
     assert today.latest_term_total is not None
     assert today.latest_term_total.student_name == "Bob"
     assert today.latest_term_total.total_minutes == 90
+
+
+def test_prepare_touch_closes_previous_day_open_session_at_midnight(db_session):
+    student = StudentService(db_session).register_student(
+        StudentCreate(student_code="S003", name="Night User", card_id="CARD3")
+    )
+    svc = AttendanceService(db_session)
+    entered_at = now_jst().replace(
+        hour=23, minute=30, second=0, microsecond=0
+    ) - timedelta(days=1)
+
+    pending = svc.prepare_touch("CARD3", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+
+    next_morning = entered_at.replace(
+        hour=9, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+    reopened = svc.prepare_touch("CARD3", "reader", next_morning)
+
+    assert reopened.current_status == AttendanceStatus.OUTSIDE
+    closed_session = svc.att_repo.get_open_session(student.id)
+    assert closed_session is None
+
+    sessions = svc.att_repo.list_sessions_overlapping_period(
+        student.id, entered_at, next_morning
+    )
+    assert len(sessions) == 1
+    assert from_unix_seconds(sessions[0].left_at) == entered_at.replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) + timedelta(days=1)
+
+
+def test_term_total_uses_only_9_to_17_minutes(db_session):
+    StudentService(db_session).register_student(
+        StudentCreate(student_code="S004", name="Business User", card_id="CARD4")
+    )
+    svc = AttendanceService(db_session)
+    entered_at = now_jst().replace(hour=8, minute=0, second=0, microsecond=0)
+
+    pending = svc.prepare_touch("CARD4", "reader", entered_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.ENTER, entered_at)
+
+    leaving_at = entered_at.replace(hour=19, minute=0, second=0, microsecond=0)
+    pending = svc.prepare_touch("CARD4", "reader", leaving_at)
+    svc.confirm_touch(pending.touch_token, AttendanceAction.LEAVE_FINAL, leaving_at)
+
+    student, total_minutes, _, _ = svc.get_current_term_total_minutes_by_card(
+        "CARD4", now=leaving_at
+    )
+    assert student.student_code == "S004"
+    assert total_minutes == 480

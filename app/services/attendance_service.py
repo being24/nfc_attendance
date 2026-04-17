@@ -50,7 +50,23 @@ class AttendanceService:
             return AttendanceStatus.OUTSIDE
         return AttendanceStatus(status_model.current_status)
 
+    def _close_stale_open_sessions(self, now: datetime) -> None:
+        current = ensure_jst(now)
+        today_start = current.replace(hour=0, minute=0, second=0, microsecond=0)
+        stale_sessions = self.att_repo.list_open_sessions_started_before(today_start)
+        for session in stale_sessions:
+            session_start = from_unix_seconds(session.entered_at)
+            session_end = session_start.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+            total_minutes = self._compute_net_minutes(session_start, session_end, session.id)
+            self.att_repo.close_session(session, left_at=session_end, total_minutes=total_minutes)
+            self.att_repo.upsert_status(
+                student_id=session.student_id,
+                current_status=AttendanceStatus.OUTSIDE.value,
+                last_event_id=None,
+            )
+
     def prepare_touch(self, card_id: str, reader_name: str | None, detected_at: datetime) -> ReaderTouchResponse:
+        self._close_stale_open_sessions(detected_at)
         student = self.student_repo.get_by_card_id(card_id)
         if student is None:
             self.unknown_repo.create(card_id=card_id, reader_name=reader_name, detected_at=detected_at)
@@ -216,9 +232,18 @@ class AttendanceService:
             raise UnknownCardError("未登録のカードです")
 
         current = ensure_jst(now or now_jst())
+        self._close_stale_open_sessions(current)
         start, end = self.current_term_bounds(current)
         sessions = self.att_repo.list_sessions_overlapping_period(student.id, start, end)
-        total = sum(self._compute_net_minutes_for_period(s, start, end, current) for s in sessions)
+        total = 0
+        for session in sessions:
+            session_start = from_unix_seconds(session.entered_at)
+            session_end = from_unix_seconds(session.left_at) if session.left_at is not None else current
+            overlap_start = max(session_start, start)
+            overlap_end = min(session_end, end, current)
+            if overlap_end <= overlap_start:
+                continue
+            total += self.compute_9_to_17_minutes(overlap_start, overlap_end, session.id)
         return student, total, start, min(end, current)
 
     def capture_current_term_total_by_card(
@@ -278,11 +303,13 @@ class AttendanceService:
 
     def get_today_attendance(self) -> TodayAttendanceResponse:
         now = now_jst()
+        self._close_stale_open_sessions(now)
         rows = self.att_repo.list_in_room_students()
         in_room: list[InRoomEntry] = []
         for student, session, status in rows:
             entered_at_dt = from_unix_seconds(session.entered_at)
             cumulative = self._compute_net_minutes(entered_at_dt, now, session.id)
+            business_cumulative = self.compute_9_to_17_minutes(entered_at_dt, now, session.id)
             in_room.append(
                 InRoomEntry(
                     student_id=student.id,
@@ -291,6 +318,7 @@ class AttendanceService:
                     entered_at=entered_at_dt,
                     current_status=status.current_status,
                     cumulative_minutes=cumulative,
+                    business_cumulative_minutes=business_cumulative,
                 )
             )
 

@@ -151,6 +151,20 @@ class AttendanceRepository:
         )
         return list(self.db.execute(stmt).all())
 
+    def list_open_sessions_started_before(self, cutoff: datetime) -> list[AttendanceSession]:
+        cutoff_ts = to_unix_seconds(cutoff)
+        stmt = (
+            select(AttendanceSession)
+            .where(
+                and_(
+                    AttendanceSession.left_at.is_(None),
+                    AttendanceSession.entered_at < cutoff_ts,
+                )
+            )
+            .order_by(AttendanceSession.entered_at)
+        )
+        return list(self.db.scalars(stmt).all())
+
     def list_sessions_overlapping_period(self, student_id: int, start: datetime, end: datetime) -> list[AttendanceSession]:
         start_ts = to_unix_seconds(start)
         end_ts = to_unix_seconds(end)

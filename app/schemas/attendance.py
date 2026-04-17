@@ -20,6 +20,7 @@ class InRoomEntry(BaseModel):
     entered_at: datetime
     current_status: str
     cumulative_minutes: int
+    business_cumulative_minutes: int
 
 
 class UnknownCardAlertResponse(BaseModel):

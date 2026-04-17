@@ -36,6 +36,29 @@ def test_admin_pages(client):
         assert res.status_code == 200
 
 
+def test_admin_today_shows_actual_and_business_minutes(client):
+    login_res = client.post(
+        "/login",
+        data={"username": "admin", "password": "admin", "next": "/admin/today"},
+        follow_redirects=False,
+    )
+    assert login_res.status_code == 303
+
+    client.post(
+        "/api/students",
+        json={"student_code": "S102", "name": "Biz User", "card_id": "CARD102"},
+    )
+    client.post(
+        "/touch/simulate",
+        data={"card_id": "CARD102", "action": "ENTER"},
+    )
+
+    res = client.get("/admin/today")
+    assert res.status_code == 200
+    assert "累計在室時間" in res.text
+    assert "9-17換算" in res.text
+
+
 def test_admin_student_edit_can_update_student_code(client):
     login_res = client.post(
         "/login",
