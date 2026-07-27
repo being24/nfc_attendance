@@ -19,7 +19,19 @@ uv sync
 uv run fastapi dev app/main.py
 ```
 
-または
+`fastapi dev` を使用するには、FastAPI の CLI を含む追加依存関係が必要です。
+次のエラーが表示された場合は、`fastapi[standard]` を追加してください。
+
+```text
+To use the fastapi command, please install "fastapi[standard]"
+```
+
+```bash
+uv add "fastapi[standard]"
+uv run fastapi dev app/main.py
+```
+
+追加依存関係をインストールせず、現在の依存関係で起動する場合:
 
 ```bash
 uv run python -m uvicorn app.main:app --reload
