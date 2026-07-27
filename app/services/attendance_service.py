@@ -6,8 +6,17 @@ from sqlalchemy.orm import Session
 
 from app.domain.enums import AttendanceAction, AttendanceStatus
 from app.domain.pending_touch import PendingTouch
-from app.domain.state_machine import InvalidTransitionError, get_allowed_actions, next_state
-from app.domain.time_utils import ensure_jst, from_unix_seconds, minutes_between, now_jst
+from app.domain.state_machine import (
+    InvalidTransitionError,
+    get_allowed_actions,
+    next_state,
+)
+from app.domain.time_utils import (
+    ensure_jst,
+    from_unix_seconds,
+    minutes_between,
+    now_jst,
+)
 from app.repositories.attendance_repository import AttendanceRepository
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.student_repository import StudentRepository
@@ -16,8 +25,18 @@ from app.realtime import attendance_event_broker
 from app.touch_panel import touch_panel_state
 from app.models.attendance_session import AttendanceSession
 from app.models.student import Student
-from app.schemas.attendance import AttendanceEventResponse, InRoomEntry, StudentCurrentTimeEntry, TermTotalLookupResponse, TodayAttendanceResponse
-from app.schemas.attendance import LockAlertResponse, TouchPanelErrorResponse, UnknownCardAlertResponse
+from app.schemas.attendance import (
+    AttendanceEventResponse,
+    InRoomEntry,
+    StudentCurrentTimeEntry,
+    TermTotalLookupResponse,
+    TodayAttendanceResponse,
+)
+from app.schemas.attendance import (
+    LockAlertResponse,
+    TouchPanelErrorResponse,
+    UnknownCardAlertResponse,
+)
 from app.schemas.reader import ReaderTouchConfirmResponse, ReaderTouchResponse
 from app.services.audit_service import AuditService
 from app.services.exceptions import (
@@ -57,20 +76,30 @@ class AttendanceService:
         stale_sessions = self.att_repo.list_open_sessions_started_before(today_start)
         for session in stale_sessions:
             session_start = from_unix_seconds(session.entered_at)
-            session_end = session_start.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-            total_minutes = self._compute_net_minutes(session_start, session_end, session.id)
-            self.att_repo.close_session(session, left_at=session_end, total_minutes=total_minutes)
+            session_end = session_start.replace(
+                hour=0, minute=0, second=0, microsecond=0
+            ) + timedelta(days=1)
+            total_minutes = self._compute_net_minutes(
+                session_start, session_end, session.id
+            )
+            self.att_repo.close_session(
+                session, left_at=session_end, total_minutes=total_minutes
+            )
             self.att_repo.upsert_status(
                 student_id=session.student_id,
                 current_status=AttendanceStatus.OUTSIDE.value,
                 last_event_id=None,
             )
 
-    def prepare_touch(self, card_id: str, reader_name: str | None, detected_at: datetime) -> ReaderTouchResponse:
+    def prepare_touch(
+        self, card_id: str, reader_name: str | None, detected_at: datetime
+    ) -> ReaderTouchResponse:
         self._close_stale_open_sessions(detected_at)
         student = self.student_repo.get_by_card_id(card_id)
         if student is None:
-            self.unknown_repo.create(card_id=card_id, reader_name=reader_name, detected_at=detected_at)
+            self.unknown_repo.create(
+                card_id=card_id, reader_name=reader_name, detected_at=detected_at
+            )
             attendance_event_broker.publish()
             raise UnknownCardError("未登録のカードです")
         if not student.is_active:
@@ -102,7 +131,9 @@ class AttendanceService:
             expires_at=pending.expires_at,
         )
 
-    def confirm_touch(self, touch_token: str, action: AttendanceAction, now: datetime | None = None) -> ReaderTouchConfirmResponse:
+    def confirm_touch(
+        self, touch_token: str, action: AttendanceAction, now: datetime | None = None
+    ) -> ReaderTouchConfirmResponse:
         pending = self._pending_touches.get(touch_token)
         if pending is None:
             raise TouchTokenNotFoundError("タッチトークンが見つかりません")
@@ -136,22 +167,38 @@ class AttendanceService:
         lock_alert_required = False
         open_session = self.att_repo.get_open_session(pending.student_id)
 
-        if pending.current_status == AttendanceStatus.OUTSIDE and action == AttendanceAction.ENTER:
+        if (
+            pending.current_status == AttendanceStatus.OUTSIDE
+            and action == AttendanceAction.ENTER
+        ):
             self.att_repo.create_session(student_id=pending.student_id, entered_at=now)
-        elif pending.current_status == AttendanceStatus.IN_ROOM and action == AttendanceAction.LEAVE_TEMP:
+        elif (
+            pending.current_status == AttendanceStatus.IN_ROOM
+            and action == AttendanceAction.LEAVE_TEMP
+        ):
             if open_session:
                 self.att_repo.start_break(session_id=open_session.id, started_at=now)
-        elif pending.current_status == AttendanceStatus.OUT_ON_BREAK and action == AttendanceAction.RETURN:
+        elif (
+            pending.current_status == AttendanceStatus.OUT_ON_BREAK
+            and action == AttendanceAction.RETURN
+        ):
             if open_session:
-                self.att_repo.end_latest_open_break(session_id=open_session.id, ended_at=now)
-        elif pending.current_status == AttendanceStatus.IN_ROOM and action == AttendanceAction.LEAVE_FINAL:
+                self.att_repo.end_latest_open_break(
+                    session_id=open_session.id, ended_at=now
+                )
+        elif (
+            pending.current_status == AttendanceStatus.IN_ROOM
+            and action == AttendanceAction.LEAVE_FINAL
+        ):
             if open_session:
                 total_minutes = self._compute_net_minutes(
                     from_unix_seconds(open_session.entered_at),
                     now,
                     open_session.id,
                 )
-                self.att_repo.close_session(open_session, left_at=now, total_minutes=total_minutes)
+                self.att_repo.close_session(
+                    open_session, left_at=now, total_minutes=total_minutes
+                )
             lock_alert_required = self.att_repo.count_in_room() == 0
             if lock_alert_required:
                 self.audit_service.log(
@@ -172,11 +219,15 @@ class AttendanceService:
             lock_alert_required=lock_alert_required,
         )
 
-    def _compute_net_minutes(self, entered_at: datetime, left_at: datetime, session_id: int) -> int:
+    def _compute_net_minutes(
+        self, entered_at: datetime, left_at: datetime, session_id: int
+    ) -> int:
         entered = ensure_jst(entered_at)
         left = ensure_jst(left_at)
         gross = minutes_between(entered, left)
-        break_minutes = self.att_repo.sum_break_minutes(session_id=session_id, until=left)
+        break_minutes = self.att_repo.sum_break_minutes(
+            session_id=session_id, until=left
+        )
         return max(0, gross - break_minutes)
 
     def _compute_net_minutes_for_period(
@@ -187,7 +238,11 @@ class AttendanceService:
         now: datetime,
     ) -> int:
         session_start = from_unix_seconds(session.entered_at)
-        session_end = from_unix_seconds(session.left_at) if session.left_at is not None else ensure_jst(now)
+        session_end = (
+            from_unix_seconds(session.left_at)
+            if session.left_at is not None
+            else ensure_jst(now)
+        )
         overlap_start = max(session_start, ensure_jst(period_start))
         overlap_end = min(session_end, ensure_jst(period_end))
         if overlap_end <= overlap_start:
@@ -197,7 +252,11 @@ class AttendanceService:
         break_minutes = 0
         for bp in self.att_repo.list_breaks(session.id):
             bp_start = from_unix_seconds(bp.started_at)
-            bp_end = from_unix_seconds(bp.ended_at) if bp.ended_at is not None else session_end
+            bp_end = (
+                from_unix_seconds(bp.ended_at)
+                if bp.ended_at is not None
+                else session_end
+            )
             b_start = max(bp_start, overlap_start)
             b_end = min(bp_end, overlap_end)
             if b_end > b_start:
@@ -211,38 +270,90 @@ class AttendanceService:
         period_end: datetime,
         now: datetime,
     ) -> tuple[int, int]:
-        sessions = self.att_repo.list_sessions_overlapping_period(student_id, period_start, period_end)
+        sessions = self.att_repo.list_sessions_overlapping_period(
+            student_id, period_start, period_end
+        )
         raw_total = 0
         business_total = 0
         for session in sessions:
             session_start = from_unix_seconds(session.entered_at)
-            session_end = from_unix_seconds(session.left_at) if session.left_at is not None else ensure_jst(now)
+            session_end = (
+                from_unix_seconds(session.left_at)
+                if session.left_at is not None
+                else ensure_jst(now)
+            )
             overlap_start = max(session_start, ensure_jst(period_start))
             overlap_end = min(session_end, ensure_jst(period_end), ensure_jst(now))
             if overlap_end <= overlap_start:
                 continue
-            raw_total += self._compute_net_minutes_for_period(session, period_start, period_end, now)
-            business_total += self.compute_9_to_17_minutes(overlap_start, overlap_end, session.id)
+            raw_total += self._compute_net_minutes_for_period(
+                session, period_start, period_end, now
+            )
+            business_total += self.compute_9_to_17_minutes(
+                overlap_start, overlap_end, session.id
+            )
         return raw_total, business_total
 
-    def current_term_bounds(self, now: datetime | None = None) -> tuple[datetime, datetime]:
+    def current_term_bounds(
+        self, now: datetime | None = None
+    ) -> tuple[datetime, datetime]:
         base = ensure_jst(now or now_jst())
         y = base.year
         m = base.month
         if 4 <= m <= 9:
             return (
-                base.replace(year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0),
-                base.replace(year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0),
+                base.replace(
+                    year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0
+                ),
+                base.replace(
+                    year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0
+                ),
             )
         if m >= 10:
             return (
-                base.replace(year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0),
-                base.replace(year=y + 1, month=4, day=1, hour=0, minute=0, second=0, microsecond=0),
+                base.replace(
+                    year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0
+                ),
+                base.replace(
+                    year=y + 1,
+                    month=4,
+                    day=1,
+                    hour=0,
+                    minute=0,
+                    second=0,
+                    microsecond=0,
+                ),
             )
         return (
-            base.replace(year=y - 1, month=10, day=1, hour=0, minute=0, second=0, microsecond=0),
-            base.replace(year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0),
+            base.replace(
+                year=y - 1, month=10, day=1, hour=0, minute=0, second=0, microsecond=0
+            ),
+            base.replace(
+                year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0
+            ),
         )
+
+    def list_student_term_totals(
+        self,
+        as_of: datetime,
+    ) -> tuple[list[tuple[Student, int]], datetime, datetime]:
+        current = ensure_jst(as_of)
+        start, term_end = self.current_term_bounds(current)
+        report_end = min(term_end, current)
+        students = sorted(
+            self.student_repo.list_all(include_inactive=True),
+            key=lambda student: (student.student_code, student.id),
+        )
+        rows = [
+            (
+                student,
+                self._compute_student_period_totals(
+                    student.id, start, report_end, current
+                )[1],
+            )
+            for student in students
+        ]
+        return rows, start, report_end
 
     def get_current_term_total_minutes_by_card(
         self,
@@ -266,9 +377,15 @@ class AttendanceService:
         detected_at: datetime,
     ) -> TermTotalLookupResponse:
         try:
-            student, total_minutes, start, end = self.get_current_term_total_minutes_by_card(card_id=card_id, now=detected_at)
+            student, total_minutes, start, end = (
+                self.get_current_term_total_minutes_by_card(
+                    card_id=card_id, now=detected_at
+                )
+            )
         except UnknownCardError:
-            self.unknown_repo.create(card_id=card_id, reader_name=reader_name, detected_at=detected_at)
+            self.unknown_repo.create(
+                card_id=card_id, reader_name=reader_name, detected_at=detected_at
+            )
             attendance_event_broker.publish()
             raise
         period = f"{start.strftime('%Y-%m-%d')} 〜 {end.strftime('%Y-%m-%d')}"
@@ -288,7 +405,9 @@ class AttendanceService:
             detected_at=display.detected_at,
         )
 
-    def compute_9_to_17_minutes(self, entered_at: datetime, left_at: datetime, session_id: int) -> int:
+    def compute_9_to_17_minutes(
+        self, entered_at: datetime, left_at: datetime, session_id: int
+    ) -> int:
         entered = ensure_jst(entered_at)
         left = ensure_jst(left_at)
         if left <= entered:
@@ -314,7 +433,9 @@ class AttendanceService:
 
         return max(0, business_minutes - break_minutes_in_business)
 
-    def list_student_current_times(self, target: str = "all", now: datetime | None = None) -> list[StudentCurrentTimeEntry]:
+    def list_student_current_times(
+        self, target: str = "all", now: datetime | None = None
+    ) -> list[StudentCurrentTimeEntry]:
         if target not in self.CURRENT_TIME_TARGETS:
             raise ValueError(f"unknown target: {target}")
 
@@ -334,7 +455,9 @@ class AttendanceService:
         entries: list[StudentCurrentTimeEntry] = []
         for student in students:
             session_row = open_session_rows.get(student.id)
-            cumulative, business_cumulative = self._compute_student_period_totals(student.id, start, end, current)
+            cumulative, business_cumulative = self._compute_student_period_totals(
+                student.id, start, end, current
+            )
             if session_row is not None:
                 session, status = session_row
                 entered_at_dt = from_unix_seconds(session.entered_at)
@@ -371,7 +494,9 @@ class AttendanceService:
         for student, session, status in rows:
             entered_at_dt = from_unix_seconds(session.entered_at)
             cumulative = self._compute_net_minutes(entered_at_dt, now, session.id)
-            business_cumulative = self.compute_9_to_17_minutes(entered_at_dt, now, session.id)
+            business_cumulative = self.compute_9_to_17_minutes(
+                entered_at_dt, now, session.id
+            )
             in_room.append(
                 InRoomEntry(
                     student_id=student.id,
@@ -428,7 +553,9 @@ class AttendanceService:
             ),
         )
 
-    def get_latest_unknown_card_alert(self, now: datetime | None = None) -> UnknownCardAlertResponse | None:
+    def get_latest_unknown_card_alert(
+        self, now: datetime | None = None
+    ) -> UnknownCardAlertResponse | None:
         current = ensure_jst(now or now_jst())
         latest_unknown = self.unknown_repo.get_latest()
         if latest_unknown is None:
@@ -445,7 +572,9 @@ class AttendanceService:
             detected_at=detected_at,
         )
 
-    def get_latest_lock_alert(self, now: datetime | None = None) -> LockAlertResponse | None:
+    def get_latest_lock_alert(
+        self, now: datetime | None = None
+    ) -> LockAlertResponse | None:
         current = ensure_jst(now or now_jst())
         if self.att_repo.count_in_room() != 0:
             return None

@@ -1,16 +1,17 @@
 import csv
 import io
-from datetime import datetime
+from datetime import date, datetime, time
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.domain.time_utils import from_unix_seconds, to_unix_seconds
+from app.domain.time_utils import from_unix_seconds, now_jst, to_unix_seconds
 from app.models.attendance_event import AttendanceEvent
 from app.models.student import Student
+from app.services.attendance_service import AttendanceService
 
 router = APIRouter(prefix="/api/export", tags=["export"])
 
@@ -33,7 +34,9 @@ def _event_rows_between(db: Session, start: datetime, end: datetime):
 def _csv_response(rows: list[tuple[AttendanceEvent, Student]]) -> Response:
     buffer = io.StringIO()
     writer = csv.writer(buffer)
-    writer.writerow(["student_code", "name", "event_type", "occurred_at", "source", "reader_name"])
+    writer.writerow(
+        ["student_code", "name", "event_type", "occurred_at", "source", "reader_name"]
+    )
     for event, student in rows:
         writer.writerow(
             [
@@ -46,6 +49,54 @@ def _csv_response(rows: list[tuple[AttendanceEvent, Student]]) -> Response:
             ]
         )
     return Response(content=buffer.getvalue(), media_type="text/csv; charset=utf-8")
+
+
+def _semester_totals_csv_response(
+    rows: list[tuple[Student, int]],
+    start: datetime,
+    end: datetime,
+) -> Response:
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        ["学籍番号", "氏名", "半期通算時間", "半期通算分", "集計開始日", "集計終了日"]
+    )
+    for student, total_minutes in rows:
+        writer.writerow(
+            [
+                student.student_code,
+                student.name,
+                f"{total_minutes // 60}:{total_minutes % 60:02d}",
+                total_minutes,
+                start.date().isoformat(),
+                end.date().isoformat(),
+            ]
+        )
+
+    content = buffer.getvalue().encode("cp932")
+    filename = f"semester_totals_{end.date().isoformat()}.csv"
+    return Response(
+        content=content,
+        media_type="text/csv; charset=shift_jis",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.get("/semester-totals.csv")
+def export_semester_totals_csv(
+    as_of: date = Query(...),
+    db: Session = Depends(get_db),
+):
+    current = now_jst()
+    if as_of > current.date():
+        raise HTTPException(status_code=400, detail="未来の日付は指定できません")
+
+    report_at = current
+    if as_of < current.date():
+        report_at = datetime.combine(as_of, time.max)
+
+    rows, start, end = AttendanceService(db).list_student_term_totals(report_at)
+    return _semester_totals_csv_response(rows, start, end)
 
 
 @router.get("/monthly.csv")

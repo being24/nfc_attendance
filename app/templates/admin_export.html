@@ -1,6 +1,17 @@
 {% extends "base.html" %}
 {% block content %}
 <section class="card">
+  <h1>CSV出力（半期通算）</h1>
+  <form method="get" action="/api/export/semester-totals.csv">
+    <label>集計日 <input type="date" name="as_of" value="{{ as_of }}" max="{{ as_of }}" required></label>
+    <p>集計日が属する半期の開始日から、指定した日までの通算在室時間を出力します。</p>
+    <div class="actions">
+      <button class="btn" type="submit">Shift-JISでダウンロード</button>
+    </div>
+  </form>
+</section>
+
+<section class="card" style="margin-top: 1rem;">
   <h1>CSV出力（月次）</h1>
   <form method="get" action="/api/export/monthly.csv">
     <label>年 <input type="number" name="year" min="2000" max="2100" value="{{ year }}" required></label>

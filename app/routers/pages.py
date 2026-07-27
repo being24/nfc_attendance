@@ -41,7 +41,9 @@ SOURCE_LABELS = {
 }
 
 
-def build_touch_result_message(card_id: str, action: str, action_label: str, next_status_label: str) -> str:
+def build_touch_result_message(
+    card_id: str, action: str, action_label: str, next_status_label: str
+) -> str:
     action_messages = {
         AttendanceAction.ENTER.value: "入室しました",
         AttendanceAction.LEAVE_TEMP.value: "一時退出しました",
@@ -96,14 +98,18 @@ def manual_touch(
     allowed = [a.value for a in touch.allowed_actions]
     chosen = allowed[0] if action == "auto" else action
     if chosen not in allowed:
-        raise InvalidActionError(f"許可されていない操作です（許可: {', '.join(allowed)}）")
+        raise InvalidActionError(
+            f"許可されていない操作です（許可: {', '.join(allowed)}）"
+        )
     confirm = attendance_service.confirm_touch(
         touch_token=touch.touch_token,
         action=AttendanceAction(chosen),
         now=now_jst(),
     )
     chosen_label = ACTION_LABELS.get(chosen, chosen)
-    next_status_label = STATUS_LABELS.get(confirm.next_status.value, confirm.next_status.value)
+    next_status_label = STATUS_LABELS.get(
+        confirm.next_status.value, confirm.next_status.value
+    )
     return templates.TemplateResponse(
         request,
         "touch_result.html",
@@ -154,7 +160,11 @@ def student_term_total_page(
     card_id: str = Form(...),
     attendance_service: AttendanceService = Depends(get_attendance_service),
 ):
-    student, total_minutes, start, end = attendance_service.get_current_term_total_minutes_by_card(card_id=card_id, now=now_jst())
+    student, total_minutes, start, end = (
+        attendance_service.get_current_term_total_minutes_by_card(
+            card_id=card_id, now=now_jst()
+        )
+    )
     hours = total_minutes // 60
     minutes = total_minutes % 60
     period = f"{start.strftime('%Y-%m-%d')} 〜 {end.strftime('%Y-%m-%d')}"
@@ -408,6 +418,8 @@ def admin_export_page(request: Request):
         "admin_export.html",
         {
             "title": "CSV出力",
+            "start_date": now.replace(day=1).date().isoformat(),
+            "end_date": now.date().isoformat(),
             "year": now.year,
             "month": now.month,
             "semester_year": semester_year,
