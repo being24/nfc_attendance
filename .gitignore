@@ -14,5 +14,6 @@ logs/*.log.*
 .vscode/*
 
 *.csv
+研究室出欠2026*.xlsx
 *Zone.Identifier
 .env
