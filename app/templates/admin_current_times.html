@@ -2,6 +2,7 @@
 {% block content %}
 <section class="card">
   <h1>現在時間一覧</h1>
+  <p>通算在室時間の集計開始日: {{ term_start.strftime('%Y-%m-%d') }}</p>
   <div class="filter-bar" role="tablist" aria-label="表示対象">
     {% for key, label in target_labels.items() %}
     <a

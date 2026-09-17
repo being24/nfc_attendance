@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<section class="card">
+  <h1>学期設定</h1>
+  <p>選択中の学期の開始日から現在までを、学生ごとの通算在室時間として集計します。</p>
+  <form method="post" action="/admin/term-settings">
+    <label>集計する学期
+      <select name="active_term">
+        <option value="1" {% if settings.active_term == 1 %}selected{% endif %}>前期</option>
+        <option value="2" {% if settings.active_term == 2 %}selected{% endif %}>後期</option>
+      </select>
+    </label>
+    <label>前期開始日 <input type="date" name="first_term_start_date" value="{{ settings.first_term_start_date.isoformat() }}" required></label>
+    <label>後期開始日 <input type="date" name="second_term_start_date" value="{{ settings.second_term_start_date.isoformat() }}" required></label>
+    <div class="actions">
+      <button class="btn" type="submit">保存</button>
+    </div>
+  </form>
+</section>
+{% endblock %}

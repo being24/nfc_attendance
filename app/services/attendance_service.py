@@ -39,6 +39,7 @@ from app.schemas.attendance import (
 )
 from app.schemas.reader import ReaderTouchConfirmResponse, ReaderTouchResponse
 from app.services.audit_service import AuditService
+from app.services.term_settings_service import TermSettingsService
 from app.services.exceptions import (
     InactiveStudentError,
     InvalidActionError,
@@ -62,6 +63,7 @@ class AttendanceService:
         self.audit_repo = AuditRepository(db)
         self.unknown_repo = UnknownCardRepository(db)
         self.audit_service = AuditService(db)
+        self.term_settings_service = TermSettingsService(db)
         self._pending_touches = self._shared_pending_touches
 
     def _get_current_status(self, student_id: int) -> AttendanceStatus:
@@ -298,48 +300,21 @@ class AttendanceService:
         self, now: datetime | None = None
     ) -> tuple[datetime, datetime]:
         base = ensure_jst(now or now_jst())
-        y = base.year
-        m = base.month
-        if 4 <= m <= 9:
-            return (
-                base.replace(
-                    year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0
-                ),
-                base.replace(
-                    year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0
-                ),
-            )
-        if m >= 10:
-            return (
-                base.replace(
-                    year=y, month=10, day=1, hour=0, minute=0, second=0, microsecond=0
-                ),
-                base.replace(
-                    year=y + 1,
-                    month=4,
-                    day=1,
-                    hour=0,
-                    minute=0,
-                    second=0,
-                    microsecond=0,
-                ),
-            )
-        return (
-            base.replace(
-                year=y - 1, month=10, day=1, hour=0, minute=0, second=0, microsecond=0
-            ),
-            base.replace(
-                year=y, month=4, day=1, hour=0, minute=0, second=0, microsecond=0
-            ),
+        settings = self.term_settings_service.get_settings(base)
+        start_date = (
+            settings.first_term_start_date
+            if settings.active_term == 1
+            else settings.second_term_start_date
         )
+        start = datetime.combine(start_date, datetime.min.time(), tzinfo=base.tzinfo)
+        return start, base
 
     def list_student_term_totals(
         self,
         as_of: datetime,
     ) -> tuple[list[tuple[Student, int]], datetime, datetime]:
         current = ensure_jst(as_of)
-        start, term_end = self.current_term_bounds(current)
-        report_end = min(term_end, current)
+        start, report_end = self.current_term_bounds(current)
         students = sorted(
             self.student_repo.list_all(include_inactive=True),
             key=lambda student: (student.student_code, student.id),
@@ -366,9 +341,11 @@ class AttendanceService:
 
         current = ensure_jst(now or now_jst())
         self._close_stale_open_sessions(current)
-        start, end = self.current_term_bounds(current)
-        _, total = self._compute_student_period_totals(student.id, start, end, current)
-        return student, total, start, min(end, current)
+        start, report_end = self.current_term_bounds(current)
+        _, total = self._compute_student_period_totals(
+            student.id, start, report_end, current
+        )
+        return student, total, start, report_end
 
     def capture_current_term_total_by_card(
         self,

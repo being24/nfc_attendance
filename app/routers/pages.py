@@ -1,12 +1,15 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.admin_session import require_admin_page_auth
+from app.db import get_db
+from app.deps import get_attendance_service, get_student_service
 from app.domain.enums import AttendanceAction
 from app.domain.time_utils import now_jst
-from app.deps import get_attendance_service, get_student_service
-from app.kiosk import kiosk_state, KioskMode
+from app.kiosk import KioskMode, kiosk_state
 from app.schemas.student import StudentCreate, StudentUpdate
 from app.services.attendance_service import AttendanceService
 from app.services.exceptions import (
@@ -16,6 +19,7 @@ from app.services.exceptions import (
     StudentNotFoundError,
 )
 from app.services.student_service import StudentService
+from app.services.term_settings_service import TermSettingsService
 from app.touch_panel import TouchPanelSelection, touch_panel_state
 
 router = APIRouter(tags=["pages"])
@@ -216,6 +220,7 @@ def admin_current_times_page(
     if target not in AttendanceService.CURRENT_TIME_TARGETS:
         raise HTTPException(status_code=400, detail="不正な表示対象です")
     entries = attendance_service.list_student_current_times(target=target)
+    term_start, _ = attendance_service.current_term_bounds()
     return templates.TemplateResponse(
         request,
         "admin_current_times.html",
@@ -229,8 +234,44 @@ def admin_current_times_page(
                 "active": "有効のみ",
                 "in_room": "在室中のみ",
             },
+            "term_start": term_start,
         },
     )
+
+
+@router.get("/admin/term-settings", response_class=HTMLResponse)
+def admin_term_settings_page(request: Request, db=Depends(get_db)):
+    redirect = require_admin_page_auth(request)
+    if redirect:
+        return redirect
+    settings = TermSettingsService(db).get_settings()
+    return templates.TemplateResponse(
+        request,
+        "admin_term_settings.html",
+        {"title": "学期設定", "settings": settings},
+    )
+
+
+@router.post("/admin/term-settings")
+def admin_term_settings_update(
+    request: Request,
+    active_term: int = Form(...),
+    first_term_start_date: date = Form(...),
+    second_term_start_date: date = Form(...),
+    db=Depends(get_db),
+):
+    redirect = require_admin_page_auth(request)
+    if redirect:
+        return redirect
+    try:
+        TermSettingsService(db).update_settings(
+            active_term,
+            first_term_start_date,
+            second_term_start_date,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return RedirectResponse(url="/admin/term-settings", status_code=303)
 
 
 @router.get("/admin/students", response_class=HTMLResponse)
