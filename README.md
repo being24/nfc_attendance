@@ -11,6 +11,31 @@ uv sync
 プロジェクト直下の `.env` は起動時に自動で読み込まれます。
 必要に応じて `.env.example` をコピーして `.env` を作成してください。
 
+## サーバー更新・再起動
+
+systemd で運用しているサーバーでは、プロジェクトディレクトリで以下を実行します。
+
+```bash
+cd /home/nakazawa29/programs/nfc_attendance
+git pull
+~/.local/bin/uv sync --locked
+sudo systemctl restart nfc-attendance-web.service
+sudo systemctl status nfc-attendance-web.service --no-pager
+```
+
+Webアプリの変更は `nfc-attendance-web.service` の再起動で反映されます。NFCリーダーの再起動が必要な変更では、次も実行します。
+
+```bash
+sudo systemctl restart nfc-attendance-reader.service
+sudo systemctl status nfc-attendance-reader.service --no-pager
+```
+
+起動に失敗した場合は、直近のログを確認します。
+
+```bash
+journalctl -u nfc-attendance-web.service -n 50 --no-pager
+```
+
 ## 起動方法
 
 ### FastAPIサーバ
@@ -114,6 +139,8 @@ uv run python -m reader.main --base-url http://127.0.0.1:8000 --card-id CARD1 --
 - `/` 打刻待受
 - `/login` 管理者ログイン
 - `/admin/today` 本日在室
+- `/admin/current-times` 現在時間一覧
+- `/admin/term-settings` 学期設定
 - `/admin/students` 学生一覧・編集
 - `/admin/events` 本日イベント
 - `/admin/export` CSV出力
